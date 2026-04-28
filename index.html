@@ -1356,8 +1356,7 @@ function loadSettings() {
         updateTokenUI();
 
         if (state.tokenExpireAt > Date.now()/1000) {
-            startPriceMonitor();
-            log('info', '系统启动，Token 有效，开始监控行情...');
+            log('info', '系统启动，Token 有效');
         } else {
             log('info', '系统启动，Token 已过期，请刷新');
         }
@@ -1365,6 +1364,10 @@ function loadSettings() {
         updateTokenUI();
         log('info', '系统启动，请先配置 Token');
     }
+
+    // 行情监控不依赖 Token，始终启动
+    startPriceMonitor();
+    log('info', '行情监控已启动');
 
     // Restore strategies (migrate old format)
     const savedStrats = localStorage.getItem('hibt_strategies');
