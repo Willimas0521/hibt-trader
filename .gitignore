@@ -1,0 +1,23 @@
+node_modules/
+*.log
+.env
+
+# 敏感凭证 - 绝不上传
+.hibt_token_cache.json
+*.json
+
+# 浏览器数据目录
+.hibt_browser/
+.hibt_browser_data/
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.py
+
+# 本地工具文件（不需要部署）
+server.js
+start.bat
+start-simple.bat
+start-with-ngrok.js
+price-server.js

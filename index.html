@@ -1,0 +1,1405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HiBT Auto Trader</title>
+<style>
+:root {
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-card: #1c2128;
+    --bg-input: #21262d;
+    --border: #30363d;
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --text-muted: #6e7681;
+    --accent: #58a6ff;
+    --accent-hover: #79c0ff;
+    --green: #3fb950;
+    --green-bg: rgba(63,185,80,0.15);
+    --red: #f85149;
+    --red-bg: rgba(248,81,73,0.15);
+    --yellow: #d29922;
+    --yellow-bg: rgba(210,153,34,0.15);
+    --orange: #db6d28;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.5;
+    min-height: 100vh;
+}
+
+/* Header */
+.header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+.header-left { display: flex; align-items: center; gap: 12px; }
+.logo {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, #58a6ff, #a371f7);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 18px;
+}
+.title { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+.subtitle { color: var(--text-secondary); font-size: 13px; }
+
+/* Status Badge */
+.status-badge {
+    padding: 4px 12px; border-radius: 20px;
+    font-size: 12px; font-weight: 600;
+    display: flex; align-items: center; gap: 6px;
+    cursor: pointer; transition: all 0.2s;
+}
+.status-badge .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.4 } }
+.status-connected { background: var(--green-bg); color: var(--green); border: 1px solid rgba(63,185,80,0.3); }
+.status-disconnected { background: var(--red-bg); color: var(--red); border: 1px solid rgba(248,81,73,0.3); }
+.status-connected .dot { background: var(--green); }
+.status-disconnected .dot { background: var(--red); animation: none; }
+
+/* Main Layout */
+.main { max-width: 1400px; margin: 0 auto; padding: 24px; display: grid;
+       grid-template-columns: 340px 1fr; gap: 24px; }
+
+/* Sidebar */
+.sidebar { display: flex; flex-direction: column; gap: 16px; }
+
+.card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+}
+.card-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px; font-weight: 600;
+    display: flex; align-items: center; justify-content: space-between;
+    color: var(--text-secondary);
+}
+.card-header svg { width: 16px; height: 16px; opacity: 0.7; cursor: pointer; transition: opacity; }
+.card-header svg:hover { opacity: 1; }
+.card-body { padding: 16px 18px; }
+
+/* Form Elements */
+.form-group { margin-bottom: 14px; }
+.form-group:last-child { margin-bottom: 0; }
+.form-label {
+    display: block; font-size: 12px; font-weight: 500;
+    color: var(--text-secondary); margin-bottom: 6px;
+}
+.form-select, .form-input {
+    width: 100%; padding: 9px 12px;
+    background: var(--bg-input); color: var(--text-primary);
+    border: 1px solid var(--border); border-radius: 8px;
+    font-size: 14px; outline: none; transition: border-color 0.2s;
+    font-family: inherit;
+}
+.form-select:focus, .form-input:focus { border-color: var(--accent); }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.form-hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+.btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    border: none; cursor: pointer; transition: all 0.2s; font-family: inherit;
+    width: 100%;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-success { background: var(--green); color: #fff; }
+.btn-danger { background: var(--red); color: #fff; }
+.btn-outline { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+.btn-outline:hover { border-color: var(--accent); color: var(--accent); background: rgba(88,166,255,0.06); }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+.btn-group { display: flex; gap: 8px; }
+.btn-group .btn { flex: 1; }
+
+/* Token Status */
+.token-status {
+    background: var(--bg-input);
+    border-radius: 8px; padding: 12px;
+    font-size: 12px; line-height: 1.8;
+}
+.token-status .row { display: flex; justify-content: space-between; }
+.token-status .label { color: var(--text-secondary); }
+.token-status .value { color: var(--text-primary); font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 11px; }
+.token-status .value.valid { color: var(--green); }
+.token-status .value.expired { color: var(--red); }
+
+/* Price Display */
+.price-main { text-align: center; padding: 8px 0 16px; }
+.price-value { font-size: 32px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.price-up { color: var(--green); }
+.price-down { color: var(--red); }
+.price-change { font-size: 14px; font-weight: 600; margin-top: 4px; }
+.price-change .percent { margin-left: 4px; }
+
+/* Order Panel */
+.direction-toggle {
+    display: flex; border-radius: 8px; overflow: hidden;
+    border: 1px solid var(--border);
+}
+.direction-btn {
+    flex: 1; padding: 12px; border: none; cursor: pointer;
+    font-size: 14px; font-weight: 700; transition: all 0.2s;
+    font-family: inherit; background: var(--bg-input); color: var(--text-secondary);
+}
+.direction-btn.active.up { background: var(--green); color: #fff; }
+.direction-btn.active.down { background: var(--red); color: #fff; }
+
+/* Tabs */
+.tabs {
+    display: flex; border-bottom: 1px solid var(--background: var(--bg-card));
+    background: var(--bg-secondary);
+    padding: 0 16px;
+}
+.tab {
+    padding: 12px 20px; font-size: 13px; font-weight: 500;
+    color: var(--text-secondary); cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    background: none; border-top: none; border-left: none; border-right: none;
+}
+.tab:hover { color: var(--text-primary); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Table */
+.table-wrap { overflow-x: auto; }
+table {
+    width: 100%; border-collapse: collapse; font-size: 13px;
+}
+thead th {
+    padding: 10px 14px; text-align: left; font-weight: 600;
+    color: var(--text-secondary); font-size: 12px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+tbody td {
+    padding: 10px 14px; border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+    font-variant-numeric: tabular-nums;
+}
+tbody tr:hover { background: rgba(136,198,255,0.04); }
+tbody tr:last-child td { border-bottom: none; }
+
+/* Badges */
+.badge {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 11px; font-weight: 600;
+}
+.badge-win { background: var(--green-bg); color: var(--green); }
+.badge-loss { background: var(--red-bg); color: var(--red); }
+.badge-pending { background: var(--yellow-bg); color: var(--yellow); }
+.badge-up { background: var(--green-bg); color: var(--green); }
+.badge-down { background: var(--red-bg); color: var(--red); }
+
+/* Log */
+.log-panel {
+    background: var(--bg-primary);
+    border-radius: 8px;
+    padding: 12px;
+    font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+    font-size: 12px;
+    max-height: 300px;
+    overflow-y: auto;
+    line-height: 1.7;
+}
+.log-entry { display: flex; gap: 8px; }
+.log-time { color: var(--text-muted); white-space: nowrap; }
+.log-msg { color: var(--text-secondary); }
+.log-msg.ok { color: var(--green); }
+.log-msg.err { color: var(--red); }
+.log-msg.info { color: var(--accent); }
+
+/* Fibonacci Levels */
+.fib-level {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 5px 10px; border-radius: 6px; margin-bottom: 3px;
+    font-size: 12px;
+}
+.fib-level-0   { background: rgba(248,81,73,0.12); color: var(--red); }
+.fib-level-236 { background: rgba(210,153,34,0.10); color: var(--yellow); }
+.fib-level-382 { background: rgba(88,166,255,0.08); color: var(--accent); }
+.fib-level-500 { background: rgba(163,113,247,0.12); color: #a371f7; }
+.fib-level-618 { background: rgba(63,185,80,0.10); color: var(--green); }
+.fib-level-786 { background: rgba(63,185,80,0.15); color: var(--green); }
+.fib-level-100 { background: rgba(63,185,80,0.20); color: var(--green); font-weight:700; }
+.fib-level-886 { background: rgba(88,166,255,0.18); color: var(--accent); font-weight:700; }
+.fib-pct { width:85px;text-align:right;font-weight:600;opacity:.8;cursor:default}
+.fib-price { flex:1;text-align:left;margin-left:12px;font-family:'Cascadia Code','Fira Code',monospace;font-weight:600;cursor:pointer}
+.fib-level { cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
+.fib-level:hover { transform: translateX(4px); box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+
+/* Fib action buttons */
+.fib-buy-up-main, .fib-buy-down-main {
+    font-size:11px;padding:2px 10px;border-radius:12px;border:none;cursor:pointer;
+    font-weight:700;transition:all 0.15s;white-space:nowrap;
+}
+.fib-buy-up-main { background:var(--green);color:#fff; }
+.fib-buy-up-main:hover { background:#4cc26a; transform:scale(1.05); }
+.fib-buy-up-light { font-size:10px;padding:2px 8px;border-radius:10px;border:none;cursor:pointer;
+    background:rgba(63,185,80,0.15);color:var(--green);font-weight:600;white-space:nowrap;transition:all 0.15s;}
+.fib-buy-up-light:hover { background:rgba(63,185,80,0.25); }
+.fib-buy-up { font-size:10px;padding:2px 8px;border-radius:10px;border:none;cursor:pointer;
+    background:rgba(63,185,80,0.08);color:var(--green);white-space:nowrap;transition:all 0.15s;}
+.fib-buy-up:hover { background:rgba(63,185,80,0.18); }
+
+.fib-buy-down-main { background:var(--red);color:#fff; }
+.fib-buy-down-main:hover { background:#f96b65; transform:scale(1.05); }
+.fib-buy-down-light { font-size:10px;padding:2px 8px;border-radius:10px;border:none;cursor:pointer;
+    background:rgba(248,81,73,0.15);color:var(--red);font-weight:600;white-space:nowrap;transition:all 0.15s;}
+.fib-buy-down-light:hover { background:rgba(248,81,73,0.25); }
+.fib-buy-down { font-size:10px;padding:2px 8px;border-radius:10px;border:none;cursor:pointer;
+    background:rgba(248,81,73,0.08);color:var(--red);white-space:nowrap;transition:all 0.15s;}
+.fib-buy-down:hover { background:rgba(248,81,73,0.18); }
+.fib-ref { font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid var(--border);cursor:pointer;
+    background:transparent;color:var(--text-muted);white-space:nowrap;transition:all 0.15s;}
+.fib-ref:hover { border-color:var(--accent); color:var(--accent); }
+
+/* Grid for main area */
+.content-area { display: flex; flex-direction: column; gap: 16px; }
+
+/* Price Cards */
+.price-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;
+}
+.price-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px;
+    transition: border-color 0.2s; cursor: pointer;
+}
+.price-card:hover { border-color: var(--accent); }
+.price-card.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.pc-symbol { font-size: 13px; font-weight: 600; color: var(--text-secondary); }
+.pc-price { font-size: 22px; font-weight: 700; margin: 6px 0; }
+.pc-change { font-size: 12px; font-weight: 600; }
+.pc-change.up { color: var(--green); }
+.pc-change.down { color: var(--red); }
+
+/* Modal */
+.modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 999; opacity: 0; pointer-events: none;
+    transition: opacity 0.2s;
+}
+.modal-overlay.show { opacity: 1; pointer-events: auto; }
+.modal {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    width: 420px; max-width: 90vw;
+    padding: 24px;
+    transform: scale(0.95); transition: transform 0.2s;
+}
+.modal-overlay.show .modal { transform: scale(1); }
+.modal-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; }
+.modal-close {
+    float: right; cursor: pointer; color: var(--text-muted);
+    font-size: 20px; line-height: 1;
+}
+
+/* Toast */
+.toast-container {
+    position: fixed; top: 70px; right: 24px;
+    z-index: 1000; display: flex; flex-direction: column; gap: 8px;
+}
+.toast {
+    padding: 12px 18px; border-radius: 10px;
+    font-size: 13px; font-weight: 500;
+    animation: slideIn 0.3s ease;
+    display: flex; align-items: center; gap: 8px;
+}
+@keyframes slideIn { from { transform: translateX(40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+.toast-ok { background: var(--green-bg); color: var(--green); border: 1px solid rgba(63,185,80,0.3); }
+.toast-err { background: var(--red-bg); color: var(--red); border: 1px solid rgba(248,81,73,0.3); }
+.toast-info { background: rgba(88,166,255,0.1); color: var(--accent); border: 1px solid rgba(88,166,255,0.3); }
+
+/* Responsive */
+@media (max-width: 900px) {
+    .main { grid-template-columns: 1fr; }
+    .sidebar { order: 2; }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* Loading spinner */
+.spinner {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Empty state */
+.empty-state {
+    text-align: center; padding: 48px 24px;
+    color: var(--text-muted);
+}
+.empty-state svg { width: 48px; height: 48px; opacity: 0.3; margin-bottom: 12px; }
+
+/* Quick stats */
+.stats-row {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+}
+.stat-item {
+    background: var(--bg-input);
+    border-radius: 8px; padding: 14px; text-align: center;
+}
+.stat-label { font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }
+.stat-value { font-size: 20px; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+    <div class="header-left">
+        <div class="logo">H</div>
+        <div>
+            <div class="title">HiBT Auto Trader</div>
+            <div class="subtitle">Event Contract Trading Platform</div>
+        </div>
+    </div>
+    <div id="statusBadge" class="status-badge status-disconnected" onclick="showTokenModal()">
+        <span class="dot"></span>
+        <span id="statusText">未连接</span>
+    </div>
+</header>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Main -->
+<main class="main">
+
+<!-- Sidebar -->
+<aside class="sidebar">
+
+<!-- Token Card -->
+<div class="card">
+    <div class="card-header">
+        <span>🔑 Token 状态</span>
+        <svg viewBox="0 0 16 16" fill="currentColor" onclick="showTokenModal()" title="刷新 Token"><path d="M8 1a5 5 0 00-5 5v1h1a4 4 0 018 0h1V6a5 5 0 00-5-5zm0 2a3 3 0 013 3H5a3 3 0 013-3zm0 2H4v7a2 2 0 002 2h4a2 2 0 002-2V5H8zm0 2h3v5H5V7h3z"/></svg>
+    </div>
+    <div class="card-body">
+        <div class="token-status" id="tokenStatus">
+            <div class="row"><span class="label">状态</span><span class="value expired">未加载</span></div>
+            <div class="row"><span class="label">Key</span><span class="value">-</span></div>
+            <div class="row"><span class="label">ID</span><span class="value">-</span></div>
+            <div class="row"><span class="label">过期时间</span><span class="value">-</span></div>
+        </div>
+        <div style="margin-top:12px">
+            <button class="btn btn-outline btn-sm" onclick="refreshToken()">🔄 刷新 Token</button>
+        </div>
+    </div>
+</div>
+
+<!-- Place Order Card -->
+<div class="card">
+    <div class="card-header">
+        <span>📊 下单面板</span>
+    </div>
+    <div class="card-body">
+        <div class="form-group">
+            <label class="form-label">交易对</label>
+            <select class="form-select" id="orderSymbol">
+                <option value="btc_usdt">BTC/USDT</option>
+                <option value="eth_usdt">ETH/USDT</option>
+                <option value="sol_usdt">SOL/USDT</option>
+                <option value="bnb_usdt">BNB/USDT</option>
+                <option value="doge_usdt">DOGE/USDT</option>
+                <option value="xrp_usdt">XRP/USDT</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">方向</label>
+            <div class="direction-toggle">
+                <button class="direction-btn active up" data-dir="1" onclick="selectDir(this)">买涨 ⬆️</button>
+                <button class="direction-btn" data-dir="2" onclick="selectDir(this)">买跌 ⬇️</button>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">金额 (USDT)</label>
+                <input type="number" class="form-input" id="orderAmount" value="3" min="1">
+            </div>
+            <div class="form-group">
+                <label class="form-label">周期 (分钟)</label>
+                <select class="form-select" id="orderTimeUnit">
+                    <option value="5">5 分钟</option>
+                    <option value="10" selected>10 分钟</option>
+                    <option value="15">15 分钟</option>
+                    <option value="30">30 分钟</option>
+                    <option value="60">60 分钟</option>
+                </select>
+            </div>
+        </div>
+
+        <button class="btn btn-success" style="margin-top:4px" onclick="placeOrder()" id="placeBtn">
+            📈 买涨 ⬆️
+        </button>
+    </div>
+</div>
+
+<!-- Quick Settings Card -->
+<div class="card">
+    <div class="card-header">
+        <span>⚙️ 快捷设置</span>
+    </div>
+    <div class="card-body">
+        <div class="form-group">
+            <label class="form-label">价格刷新间隔 (秒)</label>
+            <select class="form-select" id="priceInterval">
+                <option value="2000">2 秒（实时）</option>
+                <option value="5000" selected>5 秒（推荐）</option>
+                <option value="10000">10 秒</option>
+                <option value="30000">30 秒</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">代理设置</label>
+            <input type="text" class="form-input" id="proxyUrl" value="http://127.0.0.1:7890" placeholder="留空则不使用代理">
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="saveSettings()">💾 保存配置</button>
+    </div>
+</div>
+
+</aside>
+
+<!-- Content Area -->
+<section class="content-area">
+
+<!-- Price Monitor -->
+<div class="card">
+    <div class="card-header">
+        <span>📈 实时行情</span>
+        <div style="display:flex;gap:8px;align-items:center">
+            <span id="priceSpinner" style="display:none"><span class="spinner"></span></span>
+            <span id="lastUpdate" style="font-size:11px;color:var(--text-muted)"></span>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="price-grid" id="priceGrid"></div>
+    </div>
+</div>
+
+<!-- Tabs Area -->
+<div class="card" style="flex:1;display:flex;flex-direction:column;">
+    <div class="tabs" style="margin:0;padding:0;background:none;border-bottom:1px solid var(--border)">
+        <button class="tab active" onclick="switchTab('orders',this)">📋 最近订单</button>
+        <button class="tab" onclick="switchTab('log',this)">📝 运行日志</button>
+        <button class="tab" onclick="switchTab('monitor',this)">⏱️ 监控策略</button>
+    </div>
+
+    <!-- Orders Tab -->
+    <div class="tab-pane" id="pane-orders" style="padding:0">
+        <div class="table-wrap" style="max-height:400px;overflow-y:auto">
+            <table>
+                <thead>
+                    <tr>
+                        <th>时间</th><th>交易对</th><th>方向</th><th>金额</th><th>周期</th><th>状态</th><th>结果</th>
+                    </tr>
+                </thead>
+                <tbody id="ordersBody">
+                    <tr><td colspan="7" class="empty-state">暂无订单记录</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Log Tab -->
+    <div class="tab-pane" id="pane-log" style="display:none;padding:16px">
+        <div class="log-panel" id="logPanel">
+            <div class="log-entry"><span class="log-time">--:--:--</span><span class="log-msg info">系统启动，等待操作...</span></div>
+        </div>
+    </div>
+
+    <!-- Monitor Tab -->
+    <div class="tab-pane" id="pane-monitor" style="display:none;padding:16px">
+        <div style="margin-bottom:16px">
+            <h3 style="font-size:15px;margin-bottom:12px">斐波那契回调计算器</h3>
+            <p style="font-size:12px;color:var(--text-secondary);line-height:1.6">
+                输入波段高点和低点，自动计算回调位。点击目标价位即可一键填充到下单面板。
+            </p>
+        </div>
+
+        <div id="strategyList" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
+            <!-- Saved fib calculations will be inserted here -->
+        </div>
+
+        <div class="card" style="background:var(--bg-input)">
+            <div class="card-body" style="padding:14px">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">波动高点 (High)</label>
+                        <input type="number" class="form-input" id="stratHigh" placeholder="如 95000" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">波动低点 (Low)</label>
+                        <input type="number" class="form-input" id="stratLow" placeholder="如 88000" step="0.01">
+                    </div>
+                </div>
+                <div class="form-row" style="margin-top:10px">
+                    <div class="form-group">
+                        <label class="form-label">趋势方向</label>
+                        <select class="form-select" id="stratTrend">
+                            <option value="uptrend">上升趋势 (低→高)</option>
+                            <option value="downtrend">下降趋势 (高→低)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">交易对</label>
+                        <select class="form-select" id="stratSymbol">
+                            <option value="btc_usdt">BTC/USDT</option>
+                            <option value="eth_usdt">ETH/USDT</option>
+                            <option value="sol_usdt">SOL/USDT</option>
+                            <option value="bnb_usdt">BNB/USDT</option>
+                            <option value="doge_usdt">DOGE/USDT</option>
+                            <option value="xrp_usdt">XRP/USDT</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Fibonacci preview -->
+                <div id="fibPreview" style="margin-top:14px;display:none">
+                    <div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">
+                        📐 斐波那契回调位
+                        <span style="font-size:10px;font-weight:400;color:var(--text-muted)">点击价位一键填入下单</span>
+                    </div>
+                    <div id="fibLevels"></div>
+                </div>
+
+                <button class="btn btn-primary btn-sm" style="width:auto;margin-top:12px" onclick="calcAndPreviewFib()">
+                    📐 计算回调位
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+</section>
+
+</main>
+
+<!-- Token Modal -->
+<div class="modal-overlay" id="tokenModal">
+    <div class="modal">
+        <span class="modal-close" onclick="hideTokenModal()">×</span>
+        <div class="modal-title">Token 配置</div>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">
+            填入从浏览器获取的认证信息，或使用 Playwright 自动获取。
+        </p>
+        <div class="form-group">
+            <label class="form-label">JWT Token (bget_token)</label>
+            <textarea class="form-input" id="inputToken" rows="3" style="resize:vertical;font-size:11px;font-family:monospace"
+                placeholder="eyJ0eXAiOiJKV1QiLCJhbGci..."></textarea>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">bget_key</label>
+                <input class="form-input" id="inputKey" value="HotsCoinLimboA@1">
+            </div>
+            <div class="form-group">
+                <label class="form-label">bget_id</label>
+                <input class="form-input" id="inputId" value="250709">
+            </div>
+        </div>
+        <div class="btn-group" style="margin-top:16px">
+            <button class="btn btn-outline" onclick="loadFromCache()">读取缓存</button>
+            <button class="btn btn-primary" onclick="applyToken()">应用 Token</button>
+        </div>
+    </div>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.min.js" onerror="window.__cryptoJSFailed=true"></script>
+<script>
+// Fallback: if CryptoJS didn't load, define a stub so the page doesn't crash
+if (typeof CryptoJS === 'undefined' || window.__cryptoJSFailed) {
+    console.error('CryptoJS CDN failed to load! AES signing will not work. Check your network/proxy.');
+    window.CryptoJS = {
+        enc: { Utf8: { parse: () => ({}) } },
+        AES: { encrypt: () => ({ toString: () => 'CJS_NOT_LOADED' }) },
+        mode: { ECB: {} },
+        pad: { Pkcs7: {} },
+    };
+}
+</script>
+<script>
+// ============================================================
+//  State
+// ============================================================
+const state = {
+    token: '',
+    key: '',
+    id: '',
+    tokenExpireAt: 0,
+    prices: {},
+    orders: [],
+    strategies: [],
+    selectedDir: 1,
+    priceTimer: null,
+};
+
+const SYMBOLS = [
+    { symbol: 'btc_usdt', name: 'BTC' },
+    { symbol: 'eth_usdt', name: 'ETH' },
+    { symbol: 'sol_usdt', name: 'SOL' },
+    { symbol: 'bnb_usdt', name: 'BNB' },
+    { symbol: 'doge_usdt', name: 'DOGE' },
+    { symbol: 'xrp_usdt', name: 'XRP' },
+];
+
+// ============================================================
+//  AES-ECB Sign (CryptoJS)
+// ============================================================
+function makeV() {
+    try {
+        const plain = `${Date.now()}-${state.id}`;
+        const key = CryptoJS.enc.Utf8.parse(state.key);
+        const encrypted = CryptoJS.AES.encrypt(plain, key, {
+            mode: CryptoJS.mode.ECB,
+            padding: CryptoJS.pad.Pkcs7,
+        });
+        return encrypted.toString();
+    } catch(e) {
+        console.error('makeV error:', e);
+        return '';
+    }
+}
+
+// ============================================================
+//  API Helper
+// ============================================================
+function getProxy() {
+    const p = document.getElementById('proxyUrl')?.value?.trim();
+    return p || null;
+}
+
+async function apiRequest(method, endpoint, data, params) {
+    if (!state.token || !state.key || !state.id) throw new Error('Token 未配置');
+
+    const v = makeV();
+    let url = `https://api.hibt0.com/${endpoint}?v=${encodeURIComponent(v)}`;
+    if (params) {
+        Object.entries(params).forEach(([k, v]) => url += `&${k}=${encodeURIComponent(v)}`);
+    }
+
+    const headers = {
+        'Accept': 'application/json',
+        'Authorization': state.token,
+        'x-auth-token': state.token,
+        'Client-Type': 'web',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Future-Source': '1',
+        'hc-language': 'zh_CN',
+        'hc-platform': 'web',
+        'Lang': 'zh_CN',
+        'Platform': 'PC',
+        'Origin': 'https://www.hibt.com',
+        'Referer': 'https://www.hibt.com/',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    };
+
+    const opts = {
+        method,
+        headers,
+        ...(method === 'POST' ? { body: new URLSearchParams(data).toString() } : {}),
+    };
+
+    // Proxy via backend or direct
+    try {
+        const resp = await fetch(url, opts);
+
+        // Check response header for new token
+        const newToken = resp.headers.get('authorization');
+        if (newToken && newToken !== state.token) {
+            state.token = newToken;
+            saveTokenCache();
+            log('info', 'Token 已通过响应头自动续期');
+        }
+
+        return await resp.json();
+    } catch(e) {
+        // CORS fallback: try via proxy
+        if (!getProxy()) throw e;
+        throw new Error(`请求失败: ${e.message}`);
+    }
+}
+
+// ============================================================
+//  Token Management
+// ============================================================
+function parseJwtExpiry(token) {
+    try {
+        if (!token || typeof token !== 'string') return 0;
+        const b64 = token.split('.')[1];
+        if (!b64) return 0;
+        const json = atob(b64.replace(/-/g,'+').replace(/_/g,'/'));
+        const payload = JSON.parse(json);
+        return (payload.iat || 0) + 30 * 24 * 3600;
+    } catch { return 0; }
+}
+
+function updateTokenUI() {
+    const badge = document.getElementById('statusBadge');
+    const txt = document.getElementById('statusText');
+    const st = document.getElementById('tokenStatus');
+
+    const hasToken = !!(state.token && state.key && state.id);
+    const valid = hasToken && (Date.now() / 1000 < state.tokenExpireAt - 300);
+
+    badge.className = `status-badge ${valid ? 'status-connected' : 'status-disconnected'}`;
+    txt.textContent = valid ? '已连接' : (hasToken ? '已过期' : '未连接');
+
+    const expStr = state.tokenExpireAt
+        ? new Date(state.tokenExpireAt * 1000).toLocaleString()
+        : '-';
+
+    st.innerHTML = `
+        <div class="row"><span class="label">状态</span><span class="value ${valid ? 'valid' : 'expired'}">${valid ? '有效' : (hasToken ? '已过期' : '未加载')}</span></div>
+        <div class="row"><span class="label">Key</span><span class="value">${state.key || '-'}</span></div>
+        <div class="row"><span class="label">ID</span><span class="value">${state.id || '-'}</span></div>
+        <div class="row"><span class="label">过期时间</span><span class="value">${expStr}</span></div>
+    `;
+}
+
+function saveTokenCache() {
+    localStorage.setItem('hibt_token', state.token);
+    localStorage.setItem('hibt_key', state.key);
+    localStorage.setItem('hibt_id', state.id);
+    localStorage.setItem('hibt_expire', state.tokenExpireAt);
+}
+
+function loadFromCache() {
+    document.getElementById('inputToken').value = localStorage.getItem('hibt_token') || '';
+    document.getElementById('inputKey').value = localStorage.getItem('hibt_key') || 'HotsCoinLimboA@1';
+    document.getElementById('inputId').value = localStorage.getItem('hibt_id') || '250709';
+}
+
+function applyToken() {
+    state.token = document.getElementById('inputToken').value.trim();
+    state.key = document.getElementById('inputKey').value.trim();
+    state.id = document.getElementById('inputId').value.trim();
+
+    if (!state.token || !state.key || !state.id) {
+        toast('err', '请填写完整 Token、Key 和 ID');
+        return;
+    }
+
+    state.tokenExpireAt = parseJwtExpiry(state.token);
+    saveTokenCache();
+    updateTokenUI();
+    hideTokenModal();
+    toast('ok', 'Token 已应用，有效期至 ~' + new Date(state.tokenExpireAt * 1000).toLocaleDateString());
+    log('info', `Token 已更新, key=${state.key}, id=${state.id}`);
+    startPriceMonitor();
+    loadOrders();
+}
+
+function showTokenModal() {
+    document.getElementById('tokenModal').classList.add('show');
+}
+function hideTokenModal() {
+    document.getElementById('tokenModal').classList.remove('show');
+}
+
+// ============================================================
+//  Price Monitor (Binance API)
+// ============================================================
+async function fetchPrices() {
+    const proxy = getProxy();
+    // Use multiple fallback sources for price data
+    const sources = [];
+
+    // Source 1: Direct Binance API (works if no CORS / network OK)
+    sources.push(async () => {
+        let url = 'https://api.binance.com/api/v3/ticker/24hr?symbols=' +
+            encodeURIComponent(JSON.stringify([
+                ['BTCUSDT'],['ETHUSDT'],['SOLUSDT'],['BNBUSDT'],
+                ['DOGEUSDT'],['XRPUSDT']
+            ]));
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 8000);
+        const resp = await fetch(url, { signal: controller.signal });
+        clearTimeout(timer);
+        if (!resp.ok) throw new Error('Binance HTTP ' + resp.status);
+        return await resp.json();
+    });
+
+    // Source 2: Binance via proxy
+    if (proxy) {
+        sources.push(async () => {
+            let url = 'https://api.binance.com/api/v3/ticker/24hr?symbols=' +
+                encodeURIComponent(JSON.stringify([
+                    ['BTCUSDT'],['ETHUSDT'],['SOLUSDT'],['BNBUSDT'],
+                    ['DOGEUSDT'],['XRPUSDT']
+                ]));
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 10000);
+            const resp = await fetch(url, {
+                signal: controller.signal,
+                headers: { 'Accept': 'application/json' },
+            });
+            clearTimeout(timer);
+            if (!resp.ok) throw new Error('Binance-proxy HTTP ' + resp.status);
+            return await resp.json();
+        });
+    }
+
+    // Source 3: CoinGecko free API (no auth needed, CORS-friendly)
+    sources.push(async () => {
+        const ids = 'bitcoin,ethereum,solana,binancecoin,dogecoin,ripple';
+        const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true`;
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 10000);
+        const resp = await fetch(url, { signal: controller.signal });
+        clearTimeout(timer);
+        if (!resp.ok) throw new Error('CoinGecko HTTP ' + resp.status);
+        // Convert CoinGecko format to match our mapping
+        const cgData = await resp.json();
+        const cgMapping = {
+            'bitcoin':   { symbol: 'btc_usdt', name: 'BTC' },
+            'ethereum':  { symbol: 'eth_usdt', name: 'ETH' },
+            'solana':    { symbol: 'sol_usdt', name: 'SOL' },
+            'binancecoin':{ symbol: 'bnb_usdt', name: 'BNB' },
+            'dogecoin':  { symbol: 'doge_usdt', name: 'DOGE' },
+            'ripple':    { symbol: 'xrp_usdt', name: 'XRP' },
+        };
+        return Object.entries(cgData).map(([key, val]) => ({
+            symbol: (cgMapping[key] || {}).symbol || key + '_usdt',
+            lastPrice: String(val.usd),
+            priceChangePercent: String(val.usd_24h_change || 0),
+            highPrice: '0',
+            lowPrice: '0',
+            volume: String(val.usd_24h_vol || 0),
+            _source: 'coingecko'
+        }));
+    });
+
+    // Try each source in order
+    let data = null;
+    let lastErr = null;
+    for (let i = 0; i < sources.length; i++) {
+        try {
+            data = await sources[i]();
+            break;
+        } catch(e) {
+            lastErr = e;
+            console.warn(`Price source ${i+1} failed:`, e.message);
+        }
+    }
+
+    if (!data) {
+        log('err', '所有行情源均失败: ' + (lastErr ? lastErr.message : '未知错误'));
+        return;
+    }
+
+    const mapping = {
+        'BTCUSDT': 'btc_usdt', 'ETHUSDT': 'eth_usdt',
+        'SOLUSDT': 'sol_usdt', 'BNBUSDT': 'bnb_usdt',
+        'DOGEUSDT': 'doge_usdt', 'XRPUSDT': 'xrp_usdt'
+    };
+
+    data.forEach(item => {
+        const sym = mapping[item.symbol] || item.symbol;
+        if (!sym || sym.indexOf('_usdt') === -1) return; // skip coingecko raw keys that don't match
+        state.prices[sym] = {
+            price: parseFloat(item.lastPrice),
+            change: parseFloat(item.priceChangePercent),
+            high: parseFloat(item.highPrice),
+            low: parseFloat(item.lowPrice),
+            volume: parseFloat(item.volume),
+        };
+    });
+
+    renderPrices();
+    checkStrategies();
+
+    document.getElementById('lastUpdate').textContent =
+        '更新于 ' + new Date().toLocaleTimeString();
+}
+
+function renderPrices() {
+    const grid = document.getElementById('priceGrid');
+
+    grid.innerHTML = SYMBOLS.map(s => {
+        const p = state.prices[s.symbol] || {};
+        const price = p.price || '-';
+        const change = p.change || 0;
+        const cls = change >= 0 ? 'up' : 'down';
+        const arrow = change >= 0 ? '↑' : '↓';
+
+        return `
+        <div class="price-card" onclick="document.getElementById('orderSymbol').value='${s.symbol}'">
+            <div class="pc-symbol">${s.name}/USDT</div>
+            <div class="pc-price ${cls}">${typeof price === 'number' ? formatPrice(price) : price}</div>
+            <div class="pc-change ${cls}">${arrow} ${Math.abs(change).toFixed(2)}%</div>
+        </div>`;
+    }).join('');
+}
+
+function formatPrice(p) {
+    if (p >= 1) return p.toFixed(2);
+    if (p >= 0.01) return p.toFixed(4);
+    return p.toFixed(6);
+}
+
+let priceMonitorRunning = false;
+function startPriceMonitor() {
+    if (priceMonitorRunning) return;
+    priceMonitorRunning = true;
+    fetchPrices();
+    setInterval(fetchPrices, parseInt(document.getElementById('priceInterval')?.value || 5000));
+}
+
+// ============================================================
+//  Ordering
+// ============================================================
+function selectDir(btn) {
+    document.querySelectorAll('.direction-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.selectedDir = parseInt(btn.dataset.dir);
+    // Update place button text & color based on direction
+    const placeBtn = document.getElementById('placeBtn');
+    if (state.selectedDir === 1) {
+        placeBtn.innerHTML = '📈 买涨 ⬆️';
+        placeBtn.className = 'btn btn-success';
+        placeBtn.style.marginTop = '4px';
+    } else {
+        placeBtn.innerHTML = '📉 买跌 ⬇️';
+        placeBtn.className = 'btn btn-danger';
+        placeBtn.style.marginTop = '4px';
+    }
+}
+
+async function placeOrder() {
+    if (!state.token || !state.key || !state.id) {
+        showTokenModal(); return;
+    }
+
+    const sym = document.getElementById('orderSymbol').value;
+    const dir = state.selectedDir;
+    const amt = document.getElementById('orderAmount').value;
+    const tu = document.getElementById('orderTimeUnit').value;
+
+    const btn = document.getElementById('placeBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> 下单中...';
+
+    try {
+        const result = await apiRequest('POST', 'event/event-order/place', {
+            amount: amt,
+            direction: String(dir),
+            symbol: sym,
+            timeUnit: tu,
+            langCode: 'zh_CN',
+        });
+
+        const dirText = dir === 1 ? '买涨' : '买跌';
+
+        if (result.code === 0 || result.success) {
+            toast('ok', `${dirText} ${sym.toUpperCase()} ${amt}USDT - 下单成功!`);
+            log('ok', `下单成功 | ${dirText} ${sym.toUpperCase()} ${amt}USDT ${tu}min`);
+
+            // Add to local order list
+            state.orders.unshift({
+                time: new Date().toLocaleString(),
+                symbol: sym.toUpperCase().replace('_', '/'),
+                direction: dir,
+                amount: amt,
+                timeUnit: tu,
+                status: 'submitted',
+                result: '-',
+            });
+
+            renderOrders();
+        } else {
+            const msg = result.msg || result.message || JSON.stringify(result);
+            toast('err', `下单失败: ${msg}`);
+            log('err', `下单失败: ${msg}`);
+        }
+    } catch(e) {
+        toast('err', `请求异常: ${e.message}`);
+        log('err', `请求异常: ${e.message}`);
+    }
+
+    btn.disabled = false;
+    if (dir === 1) {
+        btn.innerHTML = '📈 买涨 ⬆️';
+    } else {
+        btn.innerHTML = '📉 买跌 ⬇️';
+    }
+}
+
+// ============================================================
+//  Orders Table
+// ============================================================
+function renderOrders() {
+    const tbody = document.getElementById('ordersBody');
+    if (!state.orders.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">暂无订单记录</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = state.orders.slice(0, 50).map(o => {
+        const dCls = o.direction === 1 ? 'badge-up' : 'badge-down';
+        const dTxt = o.direction === 1 ? '买涨' : '买跌';
+        const sMap = { submitted: '<span class="badge badge-pending">提交中</span>',
+                     success: '<span class="badge badge-win">盈利</span>',
+                     loss: '<span class="badge badge-loss">亏损</span>' };
+        return `<tr>
+            <td>${o.time}</td>
+            <td>${o.symbol}</td>
+            <td><span class="badge ${dCls}">${dTxt}</span></td>
+            <td>${o.amount} USDT</td>
+            <td>${o.timeUnit}min</td>
+            <td>${sMap[o.status] || o.status || '-'}</td>
+            <td>${o.result || '-'}</td>
+        </tr>`;
+    }).join('');
+}
+
+function loadOrders() {
+    try {
+        const saved = localStorage.getItem('hibt_orders');
+        if (saved) state.orders = JSON.parse(saved);
+    } catch(e) {
+        console.warn('Failed to parse saved orders:', e);
+    }
+    renderOrders();
+}
+
+// ============================================================
+//  Fibonacci Calculator (Manual Mode)
+// ============================================================
+
+const FIB_LEVELS = [
+    { pct: 0,     label: '0% (高点)',      cls: 'fib-level-0'   },
+    { pct: 23.6,  label: '23.6%',           cls: 'fib-level-236' },
+    { pct: 38.2,  label: '38.2%',           cls: 'fib-level-382' },
+    { pct: 50,    label: '50.0%',           cls: 'fib-level-500' },
+    { pct: 61.8,  label: '61.8% ★',        cls: 'fib-level-618' },
+    { pct: 78.6,  label: '78.6% ★',        cls: 'fib-level-786' },
+    { pct: 88.6,  label: '88.6% ★',        cls: 'fib-level-886' },
+    { pct: 100,   label: '100% (低点)',    cls: 'fib-level-100' },
+];
+
+function calcFibLevels(high, low) {
+    const diff = high - low;
+    return FIB_LEVELS.map(l => ({
+        ...l,
+        price: high - (diff * l.pct / 100),
+    }));
+}
+
+/** Click a fibonacci level → fill into the order panel */
+function selectFibLevel(price, direction, label) {
+    // Set direction (buy up/down)
+    state.selectedDir = direction;
+    // Update UI buttons
+    document.querySelectorAll('.direction-btn').forEach(b => b.classList.remove('active'));
+    const targetBtn = document.querySelector(`.direction-btn[data-dir="${direction}"]`);
+    if (targetBtn) {
+        targetBtn.classList.add('active');
+        const placeBtn = document.getElementById('placeBtn');
+        if (direction === 1) {
+            placeBtn.innerHTML = '📈 买涨 ⬆️';
+            placeBtn.className = 'btn btn-success';
+        } else {
+            placeBtn.innerHTML = '📉 买跌 ⬇️';
+            placeBtn.className = 'btn btn-danger';
+        }
+        placeBtn.style.marginTop = '4px';
+    }
+
+    // Switch to orders tab so user can see and confirm
+    switchTab('orders');
+
+    toast('ok', `已选 ${label} $${price.toFixed(2)} → 请确认后点击下单`);
+    log('info', `选中斐波那契位: ${label} $${price.toFixed(2)}, 方向=${direction===1?'买涨':'买跌'}`);
+}
+
+function calcAndPreviewFib() {
+    const high = parseFloat(document.getElementById('stratHigh').value);
+    const low = parseFloat(document.getElementById('stratLow').value);
+    const trend = document.getElementById('stratTrend').value;
+    const sym = document.getElementById('stratSymbol').value;
+
+    if (!high || !low || isNaN(high) || isNaN(low)) {
+        toast('err', '请输入波动高点和低点');
+        return;
+    }
+    if (high <= low) {
+        toast('err', '高点必须大于低点');
+        return;
+    }
+
+    const levels = calcFibLevels(high, low);
+    const previewEl = document.getElementById('fibPreview');
+    const levelsEl = document.getElementById('fibLevels');
+
+    // Determine action text & click handler based on trend
+    const getAction = (pct, isUptrend) => {
+        if (isUptrend) {
+            // Uptrend: at deeper retracement levels → buy UP (做多回调)
+            if (pct >= 88.6) return { txt: '→ 买涨', dir: 1, cls: 'fib-buy-up' };
+            if (pct >= 78.6) return { txt: '→ 买涨', dir: 1, cls: 'fib-buy-up-light' };
+            if (pct >= 61.8) return { txt: '→ 买涨', dir: 1, cls: 'fib-buy-up-main' };
+            return null;
+        } else {
+            // Downtrend: at shallow retracement levels → buy DOWN (做空反弹)
+            if (pct <= 11.4) return { txt: '→ 买跌', dir: 2, cls: 'fib-buy-down' };
+            if (pct <= 23.6) return { txt: '→ 买跌', dir: 2, cls: 'fib-buy-down-light' };
+            if (pct <= 38.2) return { txt: '→ 买跌', dir: 2, cls: 'fib-buy-down-main' };
+            return null;
+        }
+    };
+
+    levelsEl.innerHTML = levels.map(l => {
+        const action = getAction(l.pct, trend === 'uptrend');
+        let actionHtml = '';
+        if (action) {
+            actionHtml = `<button class="${action.cls}" onclick='selectFibLevel(${l.price},${action.dir},"${l.label}")'>${action.txt} 🎯</button>`;
+        } else {
+            // Still clickable for reference
+            actionHtml = `<button class="fib-ref" onclick='selectFibLevel(${l.pct>=50?2:1},"${l.label}")'>查看</button>`;
+        }
+        return `
+        <div class="fib-level ${l.cls}" onclick='selectFibLevel(${l.price},${action?action.dir:(l.pct>=50?2:1)},"${l.label}")'>
+            <span class="fib-pct">${l.label}</span>
+            <span class="fib-price">$${l.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
+            ${actionHtml}
+        </div>`;
+    }).join('');
+
+    previewEl.style.display = 'block';
+}
+
+function addStrategy() {
+    // Save as a record (not auto-trade)
+    const sSym = document.getElementById('stratSymbol').value;
+    const sHigh = parseFloat(document.getElementById('stratHigh').value);
+    const sLow = parseFloat(document.getElementById('stratLow').value);
+    const sTrend = document.getElementById('stratTrend').value;
+
+    if (!sHigh || !sLow || isNaN(sHigh) || isNaN(sLow)) { toast('err', '请输入高点和低点'); return; }
+    if (sHigh <= sLow) { toast('err', '高点必须大于低点'); return; }
+
+    const levels = calcFibLevels(sHigh, sLow);
+
+    const strategy = {
+        id: Date.now(),
+        symbol: sSym,
+        high: sHigh,
+        low: sLow,
+        trend: sTrend,
+        levels: levels,
+        createdAt: new Date().toLocaleString(),
+    };
+    state.strategies.push(strategy);
+    renderStrategies();
+    localStorage.setItem('hibt_strategies', JSON.stringify(state.strategies));
+    toast('ok', `已保存: ${sSym.toUpperCase()} $${sLow.toLocaleString()} ~ $${sHigh.toLocaleString()}`);
+}
+
+function removeStrategy(id) {
+    state.strategies = state.strategies.filter(s => s.id !== id);
+    localStorage.setItem('hibt_strategies', JSON.stringify(state.strategies));
+    renderStrategies();
+}
+
+function renderStrategies() {
+    const el = document.getElementById('strategyList');
+    if (!state.strategies.length) {
+        el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">暂无保存的计算记录</div>';
+        return;
+    }
+    el.innerHTML = state.strategies.map(s => {
+        const trendIcon = s.trend === 'uptrend' ? '📈' : '📉';
+        const trendText = s.trend === 'uptrend' ? '上升' : '下降';
+        const trendColor = s.trend === 'uptrend' ? 'var(--green)' : 'var(--red)';
+        // Show key levels inline
+        const keyLevels = s.levels.filter(l => [61.8, 78.6, 88.6, 38.2, 23.6, 11.4].includes(l.pct));
+        return `
+        <div style="padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                <div style="display:flex;align-items:center;gap:8px">
+                    <span style="font-size:13px;font-weight:600">${s.symbol.toUpperCase()}</span>
+                    <span style="color:${trendColor};font-size:11px">${trendIcon} ${trendText}</span>
+                    <span style="font-size:11px;color:var(--text-muted)">
+                        $${s.low.toLocaleString()} ~ $${s.high.toLocaleString()}
+                    </span>
+                </div>
+                <button class="btn btn-outline btn-sm" style="width:auto;padding:3px 10px;font-size:11px" onclick="removeStrategy(${s.id})">删除</button>
+            </div>
+            <div style="display:flex;gap:3px;flex-wrap:wrap">
+                ${s.levels.map(l => {
+                    const isKey = [61.8, 78.6, 88.6, 38.2, 23.6].includes(l.pct);
+                    return `<span style="
+                        font-size:10px;padding:1px 7px;border-radius:10px;cursor:pointer;
+                        background:${isKey ? 'rgba(88,166,255,0.15)' : 'rgba(110,118,129,0.06)'};
+                        color:${isKey ? 'var(--accent)' : 'var(--text-muted)'};
+                        border:1px solid ${isKey ? 'rgba(88,166,255,0.2)' : 'transparent'};
+                        font-weight:${isKey?600:400}
+                        " onclick='selectFibLevel(${l.price},${s.trend==='uptrend'?1:2},"${l.label}")' title="$${l.price.toFixed(2)} — 点击填入下单">${l.label}</span>`;
+                }).join('')}
+            </div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:5px">${s.createdAt || ''}</div>
+        </div>`;
+    }).join('');
+}
+
+// No more auto-trigger checkStrategies — manual only
+function checkStrategies() {
+    // Keep function for compatibility but do nothing auto-trading
+}
+
+// ============================================================
+//  Tab Switching
+// ============================================================
+function switchTab(tab, btn) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
+    if (btn) btn.classList.add('active');
+    document.getElementById('pane-' + tab).style.display = '';
+}
+
+// ============================================================
+//  Logger & Toast
+// ============================================================
+function log(type, msg) {
+    const panel = document.getElementById('logPanel');
+    const t = new Date().toLocaleTimeString();
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    entry.innerHTML = `<span class="log-time">${t}</span><span class="log-msg ${type}">${msg}</span>`;
+    panel.appendChild(entry);
+    panel.scrollTop = panel.scrollHeight;
+
+    // Keep last 200 entries
+    while (panel.children.length > 200) panel.removeChild(panel.firstChild);
+}
+
+function toast(type, msg) {
+    const container = document.getElementById('toastContainer');
+    const el = document.createElement('div');
+    el.className = `toast toast-${type}`;
+    const icon = type === 'ok' ? '✅' : type === 'err' ? '❌' : 'ℹ️';
+    el.innerHTML = `<span>${icon}</span><span>${msg}</span>`;
+    container.appendChild(el);
+    setTimeout(() => { el.remove(); }, 4000);
+}
+
+// ============================================================
+//  Settings
+// ============================================================
+function saveSettings() {
+    localStorage.setItem('hibt_proxy', getProxy());
+    localStorage.setItem('hibt_interval', document.getElementById('priceInterval').value);
+    toast('ok', '配置已保存');
+}
+
+function loadSettings() {
+    const savedProxy = localStorage.getItem('hibt_proxy');
+    if (savedProxy) document.getElementById('proxyUrl').value = savedProxy;
+    const savedInt = localStorage.getItem('hibt_interval');
+    if (savedInt) document.getElementById('priceInterval').value = savedInt;
+}
+
+// ============================================================
+//  Init
+// ============================================================
+(function init() {
+    try {
+    loadSettings();
+
+    // Try restore token from cache
+    const cachedToken = localStorage.getItem('hibt_token');
+    const cachedKey = localStorage.getItem('hibt_key');
+    const cachedId = localStorage.getItem('hibt_id');
+    const cachedExp = localStorage.getItem('hibt_expire');
+
+    if (cachedToken && cachedKey && cachedId) {
+        state.token = cachedToken;
+        state.key = cachedKey;
+        state.id = cachedId;
+        state.tokenExpireAt = parseInt(cachedExp) || parseJwtExpiry(cachedToken);
+        updateTokenUI();
+
+        if (state.tokenExpireAt > Date.now()/1000) {
+            startPriceMonitor();
+            log('info', '系统启动，Token 有效，开始监控行情...');
+        } else {
+            log('info', '系统启动，Token 已过期，请刷新');
+        }
+    } else {
+        updateTokenUI();
+        log('info', '系统启动，请先配置 Token');
+    }
+
+    // Restore strategies (migrate old format)
+    const savedStrats = localStorage.getItem('hibt_strategies');
+    if (savedStrats) {
+        try {
+            let parsed = JSON.parse(savedStrats);
+            // Filter out old-format strategies that don't have fib levels
+            parsed = parsed.filter(s => s.levels);
+            state.strategies = parsed;
+            if (state.strategies.length) renderStrategies();
+        } catch(e) {
+            console.warn('Failed to parse saved strategies:', e);
+        }
+    }
+
+    // Save strategies on change
+    const origAdd = addStrategy;
+    window.addStrategy = function() {
+        origAdd();
+        localStorage.setItem('hibt_strategies', JSON.stringify(state.strategies));
+    };
+
+    // Close modal on outside click
+    document.getElementById('tokenModal').addEventListener('click', function(e) {
+        if (e.target === this) hideTokenModal();
+    });
+
+    // Initial empty prices
+    renderPrices();
+    } catch(e) {
+        console.error('Init error:', e);
+        alert('页面初始化错误: ' + e.message + '\n请按 F12 查看控制台详情');
+        renderPrices();  // try to at least render the UI skeleton
+    }
+})();
+</script>
+</body>
+</html>
