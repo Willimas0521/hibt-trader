@@ -569,15 +569,15 @@ tbody tr:last-child td { border-bottom: none; }
                 </div>
                 <div class="form-row" style="margin-top:10px">
                     <div class="form-group">
-                        <label class="form-label">趋势方向</label>
-                        <select class="form-select" id="stratTrend">
-                            <option value="uptrend">上升趋势 (低→高)</option>
-                            <option value="downtrend">下降趋势 (高→低)</option>
+                        <label class="label-sm">趋势方向</label>
+                        <select class="form-select form-select-sm" id="stratTrend">
+                            <option value="uptrend">📈 上升趋势 (低→高)</option>
+                            <option value="downtrend">📉 下降趋势 (高→低)</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label class="form-label">交易对</label>
-                        <select class="form-select" id="stratSymbol">
+                        <label class="label-sm">交易对</label>
+                        <select class="form-select form-select-sm" id="stratSymbol">
                             <option value="btc_usdt">BTC/USDT</option>
                             <option value="eth_usdt">ETH/USDT</option>
                             <option value="sol_usdt">SOL/USDT</option>
@@ -585,6 +585,27 @@ tbody tr:last-child td { border-bottom: none; }
                             <option value="doge_usdt">DOGE/USDT</option>
                             <option value="xrp_usdt">XRP/USDT</option>
                         </select>
+                    </div>
+                </div>
+
+                <!-- 下单参数 -->
+                <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+                    <div style="font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:8px">⚡ 回调位下单参数</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="label-sm">金额 (USDT)</label>
+                            <input type="number" class="form-input form-input-sm" id="stratAmount" value="3" min="1" step="1">
+                        </div>
+                        <div class="form-group">
+                            <label class="label-sm">周期</label>
+                            <select class="form-select form-select-sm" id="stratTimeUnit">
+                                <option value="3">3 分钟</option>
+                                <option value="5">5 分钟</option>
+                                <option value="10" selected>10 分钟</option>
+                                <option value="15">15 分钟</option>
+                                <option value="30">30 分钟</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
@@ -1121,31 +1142,61 @@ function calcFibLevels(high, low) {
     }));
 }
 
-/** Click a fibonacci level → fill into the order panel */
-function selectFibLevel(price, direction, label) {
-    // Set direction (buy up/down)
-    state.selectedDir = direction;
-    // Update UI buttons
-    document.querySelectorAll('.direction-btn').forEach(b => b.classList.remove('active'));
-    const targetBtn = document.querySelector(`.direction-btn[data-dir="${direction}"]`);
-    if (targetBtn) {
-        targetBtn.classList.add('active');
-        const placeBtn = document.getElementById('placeBtn');
-        if (direction === 1) {
-            placeBtn.innerHTML = '📈 买涨 ⬆️';
-            placeBtn.className = 'btn btn-success';
-        } else {
-            placeBtn.innerHTML = '📉 买跌 ⬇️';
-            placeBtn.className = 'btn btn-danger';
-        }
-        placeBtn.style.marginTop = '4px';
+/** Place order directly from a fibonacci level (strategy-based, no left panel needed) */
+async function placeOrderFromStrategy(price, direction, symbol, amount, timeUnit, label) {
+    if (!state.token || !state.key || !state.id) {
+        showTokenModal(); return;
     }
 
-    // Switch to orders tab so user can see and confirm
-    switchTab('orders');
+    const dirText = direction === 1 ? '买涨' : '买跌';
+    const sym = symbol || document.getElementById('orderSymbol').value;
+    const amt = amount || document.getElementById('orderAmount').value;
+    const tu = timeUnit || document.getElementById('orderTimeUnit').value;
 
-    toast('ok', `已选 ${label} $${price.toFixed(2)} → 请确认后点击下单`);
-    log('info', `选中斐波那契位: ${label} $${price.toFixed(2)}, 方向=${direction===1?'买涨':'买跌'}`);
+    if (!confirm(`${label} $${price.toFixed(2)}\n${dirText} ${sym.toUpperCase()} ${amt}USDT ${tu}min\n\n确认下单？`)) return;
+
+    try {
+        const result = await apiRequest('POST', 'event/event-order/place', {
+            amount: amt,
+            direction: String(direction),
+            symbol: sym,
+            timeUnit: tu,
+            langCode: 'zh_CN',
+        });
+
+        if (result.code === 0 || result.success) {
+            toast('ok', `${dirText} ${sym.toUpperCase()} ${amt}USDT - 下单成功!`);
+            log('ok', `下单成功 | ${dirText} ${sym.toUpperCase()} ${amt}USDT ${tu}min @ ${label} $${price.toFixed(2)}`);
+
+            state.orders.unshift({
+                time: new Date().toLocaleString(),
+                symbol: sym.toUpperCase().replace('_', '/'),
+                direction: direction,
+                amount: amt,
+                timeUnit: tu,
+                status: 'submitted',
+                result: '-',
+            });
+            renderOrders();
+        } else {
+            const msg = result.msg || result.message || JSON.stringify(result);
+            toast('err', `下单失败: ${msg}`);
+            log('err', `下单失败: ${msg}`);
+        }
+    } catch(e) {
+        toast('err', `请求异常: ${e.message}`);
+        log('err', `请求异常: ${e.message}`);
+    }
+}
+
+/** Click a fibonacci level → place order directly (or fill into panel for preview) */
+function selectFibLevel(price, direction, label) {
+    // For calcAndPreviewFib (live preview), just highlight and toast
+    // The actual "下单" button is on the fib level itself now
+    state.selectedDir = direction;
+    const dirText = direction === 1 ? '买涨' : '买跌';
+    toast('ok', `${label} $${price.toFixed(2)} → ${dirText} (点击回调位上的下单按钮直接交易)`);
+    log('info', `选中斐波那契位: ${label} $${price.toFixed(2)}, 方向=${dirText}`);
 }
 
 function calcAndPreviewFib() {
@@ -1170,33 +1221,32 @@ function calcAndPreviewFib() {
     // Determine action text & click handler based on trend
     const getAction = (pct, isUptrend) => {
         if (isUptrend) {
-            // Uptrend: deeper retracement → buy UP (做多回调)
-            // Key levels: 61.8%, 78.6%, 88.6% are the main entry zones
-            if (pct >= 88.6) return { txt: '→ 买涨', dir: 1, cls: 'fib-buy-up' };
-            if (pct >= 78.6) return { txt: '→ 买涨', dir: 1, cls: 'fib-buy-up-light' };
-            if (pct >= 61.8) return { txt: '→ 买涨', dir: 1, cls: 'fib-buy-up-main' };
+            if (pct >= 88.6) return { txt: '买涨 ⬆️', dir: 1, cls: 'fib-buy-up' };
+            if (pct >= 78.6) return { txt: '买涨 ⬆️', dir: 1, cls: 'fib-buy-up-light' };
+            if (pct >= 61.8) return { txt: '买涨 ⬆️', dir: 1, cls: 'fib-buy-up-main' };
             return null;
         } else {
-            // Downtrend: shallow retracement → buy DOWN (做空反弹)
-            // Key levels: 23.6%, 38.2%, 61.8% are the main entry zones
-            if (pct <= 23.6) return { txt: '→ 买跌', dir: 2, cls: 'fib-buy-down' };
-            if (pct <= 38.2) return { txt: '→ 买跌', dir: 2, cls: 'fib-buy-down-light' };
-            if (pct <= 61.8) return { txt: '→ 买跌', dir: 2, cls: 'fib-buy-down-main' };
+            if (pct <= 23.6) return { txt: '买跌 ⬇️', dir: 2, cls: 'fib-buy-down' };
+            if (pct <= 38.2) return { txt: '买跌 ⬇️', dir: 2, cls: 'fib-buy-down-light' };
+            if (pct <= 61.8) return { txt: '买跌 ⬇️', dir: 2, cls: 'fib-buy-down-main' };
             return null;
         }
     };
+
+    // Read order params from strategy form
+    const sAmt = document.getElementById('stratAmount').value || 3;
+    const sTu = document.getElementById('stratTimeUnit').value || 10;
 
     levelsEl.innerHTML = levels.map(l => {
         const action = getAction(l.pct, trend === 'uptrend');
         let actionHtml = '';
         if (action) {
-            actionHtml = `<button class="${action.cls}" onclick='selectFibLevel(${l.price},${action.dir},"${l.label}")'>${action.txt} 🎯</button>`;
+            actionHtml = `<button class="${action.cls}" onclick='placeOrderFromStrategy(${l.price},${action.dir},"${sym}",${sAmt},${sTu},"${l.label}")'>${action.txt} 🎯</button>`;
         } else {
-            // Still clickable for reference
-            actionHtml = `<button class="fib-ref" onclick='selectFibLevel(${l.pct>=50?2:1},"${l.label}")'>查看</button>`;
+            actionHtml = `<span style="font-size:10px;color:var(--text-muted)">参考位</span>`;
         }
         return `
-        <div class="fib-level ${l.cls}" onclick='selectFibLevel(${l.price},${action?action.dir:(l.pct>=50?2:1)},"${l.label}")'>
+        <div class="fib-level ${l.cls}">
             <span class="fib-pct">${l.label}</span>
             <span class="fib-price">$${l.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
             ${actionHtml}
@@ -1212,6 +1262,8 @@ function addStrategy() {
     const sHigh = parseFloat(document.getElementById('stratHigh').value);
     const sLow = parseFloat(document.getElementById('stratLow').value);
     const sTrend = document.getElementById('stratTrend').value;
+    const sAmount = document.getElementById('stratAmount').value || 3;
+    const sTimeUnit = document.getElementById('stratTimeUnit').value || 10;
 
     if (!sHigh || !sLow || isNaN(sHigh) || isNaN(sLow)) { toast('err', '请输入高点和低点'); return; }
     if (sHigh <= sLow) { toast('err', '高点必须大于低点'); return; }
@@ -1224,13 +1276,15 @@ function addStrategy() {
         high: sHigh,
         low: sLow,
         trend: sTrend,
+        amount: sAmount,
+        timeUnit: sTimeUnit,
         levels: levels,
         createdAt: new Date().toLocaleString(),
     };
     state.strategies.push(strategy);
     renderStrategies();
     localStorage.setItem('hibt_strategies', JSON.stringify(state.strategies));
-    toast('ok', `已保存: ${sSym.toUpperCase()} $${sLow.toLocaleString()} ~ $${sHigh.toLocaleString()}`);
+    toast('ok', `已保存: ${sSym.toUpperCase()} $${sLow.toLocaleString()} ~ $${sHigh.toLocaleString()} | ${sAmount}USDT ${sTimeUnit}min`);
 }
 
 function removeStrategy(id) {
@@ -1249,11 +1303,12 @@ function renderStrategies() {
         const trendIcon = s.trend === 'uptrend' ? '📈' : '📉';
         const trendText = s.trend === 'uptrend' ? '上升' : '下降';
         const trendColor = s.trend === 'uptrend' ? 'var(--green)' : 'var(--red)';
-        // Show key levels inline
-        const keyLevels = s.levels.filter(l => [61.8, 78.6, 88.6, 38.2, 23.6, 11.4].includes(l.pct));
+        const sAmt = s.amount || 3;
+        const sTu = s.timeUnit || 10;
+
         return `
-        <div style="padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="padding:14px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:4px">
                 <div style="display:flex;align-items:center;gap:8px">
                     <span style="font-size:13px;font-weight:600">${s.symbol.toUpperCase()}</span>
                     <span style="color:${trendColor};font-size:11px">${trendIcon} ${trendText}</span>
@@ -1263,30 +1318,42 @@ function renderStrategies() {
                 </div>
                 <button class="btn btn-outline btn-sm" style="width:auto;padding:3px 10px;font-size:11px" onclick="removeStrategy(${s.id})">删除</button>
             </div>
-            <div style="display:flex;gap:3px;flex-wrap:wrap">
+            <!-- 下单参数摘要 -->
+            <div style="font-size:10px;color:var(--text-muted);margin-bottom:8px;padding:4px 0;display:flex;gap:12px">
+                <span>💰 ${sAmt} USDT</span><span>⏱ ${sTu} 分钟</span><span style="color:${trendColor}">方向由回调位自动决定</span>
+            </div>
+            <!-- 回调位 + 一键下单按钮 -->
+            <div style="display:flex;flex-direction:column;gap:4px">
                 ${s.levels.map(l => {
                     const isKey = [61.8, 78.6, 88.6, 38.2, 23.6].includes(l.pct);
                     // Uptrend: deep retracement (61.8/78.6/88.6) → buy UP
                     // Downtrend: shallow retracement (23.6/38.2/61.8) → buy DOWN
-                    let dir = 1; // default buy up
-                    if (s.trend === 'uptrend') {
-                        dir = (l.pct >= 61.8) ? 1 : 0;
-                    } else { // downtrend
-                        dir = (l.pct <= 61.8) ? 2 : 0;
+                    let dir = 0;
+                    if (isKey) {
+                        if (s.trend === 'uptrend') {
+                            dir = (l.pct >= 61.8) ? 1 : 0;
+                        } else {
+                            dir = (l.pct <= 61.8) ? 2 : 0;
+                        }
                     }
-                    // Non-key levels: no direction, just reference
-                    if (!isKey) dir = 0;
-                    const dirLabel = dir === 1 ? '📈' : (dir === 2 ? '📉' : '');
-                    return `<span style="
-                        font-size:10px;padding:1px 7px;border-radius:10px;cursor:pointer;
-                        background:${isKey ? 'rgba(88,166,255,0.15)' : 'rgba(110,118,129,0.06)'};
-                        color:${isKey ? 'var(--accent)' : 'var(--text-muted)'};
-                        border:1px solid ${isKey ? 'rgba(88,166,255,0.2)' : 'transparent'};
-                        font-weight:${isKey?600:400}
-                        " onclick='selectFibLevel(${l.price},${dir},"${l.label}")' title="$${l.price.toFixed(2)} — 点击填入下单">${l.label}${dirLabel}</span>`;
+                    const hasOrder = dir !== 0;
+                    const dirText = dir === 1 ? '买涨 ⬆️' : (dir === 2 ? '买跌 ⬇️' : '');
+                    const orderBtnCls = dir === 1 ? 'fib-buy-up-main' : (dir === 2 ? 'fib-buy-down-main' : '');
+
+                    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 8px;border-radius:6px;${hasOrder ? 'background:rgba(88,166,255,0.06)' : ''}">
+                        <div style="display:flex;align-items:center;gap:8px;min-width:0">
+                            <span style="font-size:10px;font-weight:${isKey?700:400};color:${isKey?'var(--accent)':'var(--text-muted)'};min-width:42px">${l.label}</span>
+                            <span style="font-size:12px;font-weight:500">$${l.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
+                            ${hasOrder ? `<span style="font-size:9px;color:${dir===1?'var(--green)':'var(--red)'}">${dir===1?'📈':'📉'}</span>` : ''}
+                        </div>
+                        ${hasOrder ? `<button class="${orderBtnCls}" style="padding:2px 12px;font-size:11px" 
+                            onclick='placeOrderFromStrategy(${l.price},${dir},"${s.symbol}",${sAmt},${sTu},"${l.label}")'
+                            title="点击直接下单：${dirText} ${sAmt}USDT ${sTu}min">${dirText}</button>`
+                         : ''}
+                    </div>`;
                 }).join('')}
             </div>
-            <div style="font-size:10px;color:var(--text-muted);margin-top:5px">${s.createdAt || ''}</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:6px;text-align:right">${s.createdAt || ''}</div>
         </div>`;
     }).join('');
 }
