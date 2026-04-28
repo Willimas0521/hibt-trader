@@ -844,8 +844,8 @@ async function fetchPrices() {
     sources.push(async () => {
         let url = 'https://api.binance.com/api/v3/ticker/24hr?symbols=' +
             encodeURIComponent(JSON.stringify([
-                ['BTCUSDT'],['ETHUSDT'],['SOLUSDT'],['BNBUSDT'],
-                ['DOGEUSDT'],['XRPUSDT']
+                'BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT',
+                'DOGEUSDT','XRPUSDT'
             ]));
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 8000);
@@ -860,8 +860,8 @@ async function fetchPrices() {
         sources.push(async () => {
             let url = 'https://api.binance.com/api/v3/ticker/24hr?symbols=' +
                 encodeURIComponent(JSON.stringify([
-                    ['BTCUSDT'],['ETHUSDT'],['SOLUSDT'],['BNBUSDT'],
-                    ['DOGEUSDT'],['XRPUSDT']
+                    'BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT',
+                    'DOGEUSDT','XRPUSDT'
                 ]));
             const controller = new AbortController();
             const timer = setTimeout(() => controller.abort(), 10000);
