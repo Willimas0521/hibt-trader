@@ -1170,16 +1170,18 @@ function calcAndPreviewFib() {
     // Determine action text & click handler based on trend
     const getAction = (pct, isUptrend) => {
         if (isUptrend) {
-            // Uptrend: at deeper retracement levels → buy UP (做多回调)
+            // Uptrend: deeper retracement → buy UP (做多回调)
+            // Key levels: 61.8%, 78.6%, 88.6% are the main entry zones
             if (pct >= 88.6) return { txt: '→ 买涨', dir: 1, cls: 'fib-buy-up' };
             if (pct >= 78.6) return { txt: '→ 买涨', dir: 1, cls: 'fib-buy-up-light' };
             if (pct >= 61.8) return { txt: '→ 买涨', dir: 1, cls: 'fib-buy-up-main' };
             return null;
         } else {
-            // Downtrend: at shallow retracement levels → buy DOWN (做空反弹)
-            if (pct <= 11.4) return { txt: '→ 买跌', dir: 2, cls: 'fib-buy-down' };
-            if (pct <= 23.6) return { txt: '→ 买跌', dir: 2, cls: 'fib-buy-down-light' };
-            if (pct <= 38.2) return { txt: '→ 买跌', dir: 2, cls: 'fib-buy-down-main' };
+            // Downtrend: shallow retracement → buy DOWN (做空反弹)
+            // Key levels: 23.6%, 38.2%, 61.8% are the main entry zones
+            if (pct <= 23.6) return { txt: '→ 买跌', dir: 2, cls: 'fib-buy-down' };
+            if (pct <= 38.2) return { txt: '→ 买跌', dir: 2, cls: 'fib-buy-down-light' };
+            if (pct <= 61.8) return { txt: '→ 买跌', dir: 2, cls: 'fib-buy-down-main' };
             return null;
         }
     };
@@ -1264,13 +1266,24 @@ function renderStrategies() {
             <div style="display:flex;gap:3px;flex-wrap:wrap">
                 ${s.levels.map(l => {
                     const isKey = [61.8, 78.6, 88.6, 38.2, 23.6].includes(l.pct);
+                    // Uptrend: deep retracement (61.8/78.6/88.6) → buy UP
+                    // Downtrend: shallow retracement (23.6/38.2/61.8) → buy DOWN
+                    let dir = 1; // default buy up
+                    if (s.trend === 'uptrend') {
+                        dir = (l.pct >= 61.8) ? 1 : 0;
+                    } else { // downtrend
+                        dir = (l.pct <= 61.8) ? 2 : 0;
+                    }
+                    // Non-key levels: no direction, just reference
+                    if (!isKey) dir = 0;
+                    const dirLabel = dir === 1 ? '📈' : (dir === 2 ? '📉' : '');
                     return `<span style="
                         font-size:10px;padding:1px 7px;border-radius:10px;cursor:pointer;
                         background:${isKey ? 'rgba(88,166,255,0.15)' : 'rgba(110,118,129,0.06)'};
                         color:${isKey ? 'var(--accent)' : 'var(--text-muted)'};
                         border:1px solid ${isKey ? 'rgba(88,166,255,0.2)' : 'transparent'};
                         font-weight:${isKey?600:400}
-                        " onclick='selectFibLevel(${l.price},${s.trend==='uptrend'?1:2},"${l.label}")' title="$${l.price.toFixed(2)} — 点击填入下单">${l.label}</span>`;
+                        " onclick='selectFibLevel(${l.price},${dir},"${l.label}")' title="$${l.price.toFixed(2)} — 点击填入下单">${l.label}${dirLabel}</span>`;
                 }).join('')}
             </div>
             <div style="font-size:10px;color:var(--text-muted);margin-top:5px">${s.createdAt || ''}</div>
