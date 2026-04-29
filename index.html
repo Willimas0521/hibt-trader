@@ -619,16 +619,21 @@ tbody tr:last-child td { border-bottom: none; }
 
                 <!-- Fibonacci preview -->
                 <div id="fibPreview" style="margin-top:14px;display:none">
-                    <div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">
+                    <div class="fib-preview-hdr" style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px">
                         📐 斐波那契回调位
-                        <span style="font-size:10px;font-weight:400;color:var(--text-muted)">点击价位一键填入下单</span>
+                        <span style="font-size:10px;font-weight:400;color:var(--text-muted)">勾选"监控此位"后保存策略，价格触达时自动下单</span>
                     </div>
                     <div id="fibLevels"></div>
                 </div>
 
-                <button class="btn btn-primary btn-sm" style="width:auto;margin-top:12px" onclick="calcAndPreviewFib()">
-                    📐 计算回调位
-                </button>
+                <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+                    <button class="btn btn-outline btn-sm" style="width:auto" onclick="calcAndPreviewFib()">
+                        📐 计算回调位
+                    </button>
+                    <button class="btn btn-primary btn-sm" style="width:auto" onclick="addStrategy()">
+                        💾 保存策略
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -1227,18 +1232,15 @@ function calcAndPreviewFib() {
     const previewEl = document.getElementById('fibPreview');
     const levelsEl = document.getElementById('fibLevels');
 
-    // Determine action text & click handler based on trend
-    const getAction = (pct, isUptrend) => {
+    // Key levels that support trading
+    const KEY_LEVELS = [23.6, 38.2, 61.8, 78.6, 88.6];
+
+    // Determine direction based on trend + pct
+    const getDir = (pct, isUptrend) => {
         if (isUptrend) {
-            if (pct >= 88.6) return { txt: '买涨 ⬆️', dir: 1, cls: 'fib-buy-up' };
-            if (pct >= 78.6) return { txt: '买涨 ⬆️', dir: 1, cls: 'fib-buy-up-light' };
-            if (pct >= 61.8) return { txt: '买涨 ⬆️', dir: 1, cls: 'fib-buy-up-main' };
-            return null;
+            return (pct >= 61.8) ? 1 : 0;
         } else {
-            if (pct <= 23.6) return { txt: '买跌 ⬇️', dir: 2, cls: 'fib-buy-down' };
-            if (pct <= 38.2) return { txt: '买跌 ⬇️', dir: 2, cls: 'fib-buy-down-light' };
-            if (pct <= 61.8) return { txt: '买跌 ⬇️', dir: 2, cls: 'fib-buy-down-main' };
-            return null;
+            return (pct <= 61.8) ? 2 : 0;
         }
     };
 
@@ -1247,26 +1249,50 @@ function calcAndPreviewFib() {
     const sTu = document.getElementById('stratTimeUnit').value || 10;
 
     levelsEl.innerHTML = levels.map(l => {
-        const action = getAction(l.pct, trend === 'uptrend');
-        let actionHtml = '';
-        if (action) {
-            actionHtml = `<button class="${action.cls}" onclick='placeOrderFromStrategy(${l.price},${action.dir},"${sym}",${sAmt},${sTu},"${l.label}")'>${action.txt} 🎯</button>`;
+        const isKey = KEY_LEVELS.includes(l.pct);
+        const dir = isKey ? getDir(l.pct, trend === 'uptrend') : 0;
+        const hasOrder = dir !== 0;
+        const dirText = dir === 1 ? '买涨 ⬆️' : (dir === 2 ? '买跌 ⬇️' : '');
+        const dirColor = dir === 1 ? 'var(--green)' : (dir === 2 ? 'var(--red)' : '');
+        const orderBtnCls = dir === 1 ? 'fib-buy-up-main' : (dir === 2 ? 'fib-buy-down-main' : '');
+
+        let rightHtml = '';
+        if (hasOrder) {
+            // Checkbox for auto-trade + instant order button
+            rightHtml = `
+            <div style="display:flex;align-items:center;gap:8px">
+                <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:10px;color:var(--text-secondary);white-space:nowrap"
+                    title="勾选后保存策略，该回调位将自动监控下单">
+                    <input type="checkbox" class="fib-level-check" data-pct="${l.pct}"
+                        style="width:14px;height:14px;cursor:pointer;accent-color:var(--accent)"
+                        checked>
+                    <span>监控此位</span>
+                </label>
+                <button class="${orderBtnCls}" style="padding:2px 10px;font-size:11px"
+                    onclick='placeOrderFromStrategy(${l.price},${dir},"${sym}",${sAmt},${sTu},"${l.label}")'
+                    title="立即手动下单（弹窗确认）">${dirText} 🎯</button>
+            </div>`;
         } else {
-            actionHtml = `<span style="font-size:10px;color:var(--text-muted)">参考位</span>`;
+            rightHtml = `<span style="font-size:10px;color:var(--text-muted)">参考位</span>`;
         }
+
         return `
-        <div class="fib-level ${l.cls}">
-            <span class="fib-pct">${l.label}</span>
+        <div class="fib-level ${l.cls}" style="${hasOrder ? 'background:rgba(88,166,255,0.04);border-radius:6px' : ''}">
+            <span class="fib-pct" style="${isKey ? 'font-weight:700' : ''}">${l.label}</span>
             <span class="fib-price">$${l.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
-            ${actionHtml}
+            ${hasOrder ? `<span style="font-size:10px;color:${dirColor};min-width:40px">${dirText}</span>` : '<span style="min-width:40px"></span>'}
+            ${rightHtml}
         </div>`;
     }).join('');
 
     previewEl.style.display = 'block';
+
+    // Update preview header
+    const hdr = previewEl.querySelector('.fib-preview-hdr');
+    if (hdr) hdr.innerHTML = '📐 斐波那契回调位 &nbsp;<span style="font-size:10px;font-weight:400;color:var(--text-muted)">勾选"监控此位"后保存策略，价格触达时自动下单</span>';
 }
 
 function addStrategy() {
-    // Save as a record (not auto-trade)
     const sSym = document.getElementById('stratSymbol').value;
     const sHigh = parseFloat(document.getElementById('stratHigh').value);
     const sLow = parseFloat(document.getElementById('stratLow').value);
@@ -1277,6 +1303,14 @@ function addStrategy() {
 
     if (!sHigh || !sLow || isNaN(sHigh) || isNaN(sLow)) { toast('err', '请输入高点和低点'); return; }
     if (sHigh <= sLow) { toast('err', '高点必须大于低点'); return; }
+
+    // 读取用户在预览区勾选的回调位
+    const checkedBoxes = document.querySelectorAll('#fibLevels .fib-level-check:checked');
+    const selectedLevels = Array.from(checkedBoxes).map(cb => parseFloat(cb.dataset.pct));
+
+    // 如果预览未展开（没有勾选框），则默认选择主要回调位
+    const DEFAULT_LEVELS = sTrend === 'uptrend' ? [61.8, 78.6, 88.6] : [23.6, 38.2, 61.8];
+    const finalSelectedLevels = selectedLevels.length > 0 ? selectedLevels : DEFAULT_LEVELS;
 
     const levels = calcFibLevels(sHigh, sLow);
 
@@ -1289,13 +1323,16 @@ function addStrategy() {
         amount: sAmount,
         timeUnit: sTimeUnit,
         autoTrade: sAutoTrade,
+        selectedLevels: finalSelectedLevels,  // 用户手动指定的下单回调位
         levels: levels,
         createdAt: new Date().toLocaleString(),
     };
     state.strategies.push(strategy);
     renderStrategies();
     localStorage.setItem('hibt_strategies', JSON.stringify(state.strategies));
-    const autoLabel = sAutoTrade ? ' 🤖自动' : '';
+
+    const lvlStr = finalSelectedLevels.map(p => p + '%').join(', ');
+    const autoLabel = sAutoTrade ? ` 🤖自动 [${lvlStr}]` : ` [${lvlStr}]`;
     toast('ok', `已保存: ${sSym.toUpperCase()} $${sLow.toLocaleString()} ~ $${sHigh.toLocaleString()} | ${sAmount}USDT ${sTimeUnit}min${autoLabel}`);
 }
 
@@ -1318,6 +1355,9 @@ function renderStrategies() {
         const sAmt = s.amount || 3;
         const sTu = s.timeUnit || 10;
         const autoOn = !!s.autoTrade;
+        // 已选回调位列表（兼容旧数据，旧数据无此字段则展示全部关键位）
+        const KEY_LEVELS = [23.6, 38.2, 61.8, 78.6, 88.6];
+        const selectedLvls = s.selectedLevels || (s.trend === 'uptrend' ? [61.8, 78.6, 88.6] : [23.6, 38.2, 61.8]);
         // Border glow when auto is on
         const borderStyle = autoOn ? 'border-color:rgba(88,166,255,0.4);box-shadow:0 0 12px rgba(88,166,255,0.08)' : '';
 
@@ -1327,27 +1367,26 @@ function renderStrategies() {
                 <div style="display:flex;align-items:center;gap:8px">
                     <span style="font-size:13px;font-weight:600">${s.symbol.toUpperCase()}</span>
                     <span style="color:${trendColor};font-size:11px">${trendIcon} ${trendText}</span>
-                    ${autoOn ? '<span style="font-size:9px;background:var(--accent);color:#fff;padding:1px 6px;border-radius:8px;font-weight:700">🤖 自动</span>' : ''}
+                    ${autoOn ? '<span style="font-size:9px;background:var(--accent);color:#fff;padding:1px 6px;border-radius:8px;font-weight:700">🤖 监控中</span>' : ''}
                     <span style="font-size:11px;color:var(--text-muted)">
                         $${s.low.toLocaleString()} ~ $${s.high.toLocaleString()}
                     </span>
                 </div>
                 <div style="display:flex;gap:6px">
-                    <!-- Auto trade toggle -->
                     <button class="btn btn-sm" style="width:auto;padding:2px 8px;font-size:11px;background:${autoOn?'var(--accent)':'transparent'};color:${autoOn?'#fff':'var(--text-muted)'};border:1px solid ${autoOn?'var(--accent)': 'var(--border)'}"
-                        onclick='toggleAutoTrade(${s.id})' title="${autoOn ? '暂停自动监控' : '启用自动下单'}">${autoOn ? '🤖 运行中' : '⏸ 手动'}</button>
+                        onclick='toggleAutoTrade(${s.id})' title="${autoOn ? '暂停自动监控' : '启用自动下单'}">${autoOn ? '⏹ 停止' : '▶ 启动'}</button>
                     <button class="btn btn-outline btn-sm" style="width:auto;padding:3px 10px;font-size:11px" onclick="removeStrategy(${s.id})">删除</button>
                 </div>
             </div>
             <!-- 下单参数摘要 -->
             <div style="font-size:10px;color:var(--text-muted);margin-bottom:8px;padding:4px 0;display:flex;gap:12px;flex-wrap:wrap">
-                <span>💰 ${sAmt} USDT</span><span>⏱ ${sTu} 分钟</span><span style="color:${trendColor}">方向由回调位自动决定</span>
-                ${autoOn ? `<span style="color:var(--accent)">⚡ 价格触达 ±0.2% 时自动下单</span>` : ''}
+                <span>💰 ${sAmt} USDT</span><span>⏱ ${sTu} 分钟</span>
+                ${autoOn ? `<span style="color:var(--accent)">⚡ 价格触达选中回调位 ±0.2% 时自动下单</span>` : '<span>手动模式 — 点击下单按钮</span>'}
             </div>
-            <!-- 回调位 + 一键下单按钮 -->
+            <!-- 回调位列表 + 激活状态 -->
             <div style="display:flex;flex-direction:column;gap:4px">
                 ${s.levels.map(l => {
-                    const isKey = [61.8, 78.6, 88.6, 38.2, 23.6].includes(l.pct);
+                    const isKey = KEY_LEVELS.includes(l.pct);
                     let dir = 0;
                     if (isKey) {
                         if (s.trend === 'uptrend') {
@@ -1359,35 +1398,51 @@ function renderStrategies() {
                     const hasOrder = dir !== 0;
                     const dirText = dir === 1 ? '买涨 ⬆️' : (dir === 2 ? '买跌 ⬇️' : '');
                     const orderBtnCls = dir === 1 ? 'fib-buy-up-main' : (dir === 2 ? 'fib-buy-down-main' : '');
+                    // 是否为已选中的自动监控位
+                    const isSelected = hasOrder && selectedLvls.includes(l.pct);
 
-                    // Check if this level was recently triggered
-                    const triggerKey = `${s.id}_${l.pct}`;
+                    // 触发徽章
+                    const triggerKey = \`\${s.id}_\${l.pct}\`;
                     const triggeredAt = state.triggeredLevels[triggerKey];
                     let triggerBadge = '';
-                    if (triggeredAt && hasOrder) {
+                    if (triggeredAt && isSelected) {
                         const ago = Math.round((Date.now() - triggeredAt) / 1000);
-                        if (ago < 300) { // within 5 min
-                            triggerBadge = `<span style="font-size:9px;color:var(--accent);background:rgba(88,166,255,0.1);padding:1px 5px;border-radius:6px">✅ 已触发 ${ago}s前</span>`;
+                        if (ago < 300) {
+                            triggerBadge = \`<span style="font-size:9px;color:var(--accent);background:rgba(88,166,255,0.1);padding:1px 5px;border-radius:6px">✅ 已触发 \${ago}s前</span>\`;
                         }
                     }
 
-                    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 8px;border-radius:6px;${hasOrder ? 'background:rgba(88,166,255,0.06)' : ''}">
-                        <div style="display:flex;align-items:center;gap:8px;min-width:0">
-                            <span style="font-size:10px;font-weight:${isKey?700:400};color:${isKey?'var(--accent)':'var(--text-muted)'};min-width:42px">${l.label}</span>
-                            <span style="font-size:12px;font-weight:500">$${l.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
-                            ${hasOrder ? `<span style="font-size:9px;color:${dir===1?'var(--green)':'var(--red)'}">${dir===1?'📈':'📉'}</span>` : ''}
-                            ${triggerBadge}
+                    // 激活状态标签（点击切换）
+                    let activeTag = '';
+                    if (hasOrder) {
+                        if (isSelected) {
+                            activeTag = \`<span onclick='toggleStrategyLevel(${s.id},${l.pct})' title="点击取消监控此位"
+                                style="font-size:9px;cursor:pointer;color:#fff;background:var(--accent);padding:1px 6px;border-radius:6px;font-weight:600;user-select:none">
+                                ✓ 监控</span>\`;
+                        } else {
+                            activeTag = \`<span onclick='toggleStrategyLevel(${s.id},${l.pct})' title="点击激活监控此位"
+                                style="font-size:9px;cursor:pointer;color:var(--text-muted);background:var(--bg-input);padding:1px 6px;border-radius:6px;border:1px solid var(--border);user-select:none">
+                                + 添加</span>\`;
+                        }
+                    }
+
+                    const rowBg = isSelected ? 'background:rgba(88,166,255,0.07)' : '';
+                    return \`<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 8px;border-radius:6px;\${rowBg}">
+                        <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1">
+                            <span style="font-size:10px;font-weight:\${isKey?700:400};color:\${isKey?'var(--accent)':'var(--text-muted)'};min-width:42px">\${l.label}</span>
+                            <span style="font-size:12px;font-weight:500">$\${l.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
+                            \${activeTag}
+                            \${triggerBadge}
                         </div>
-                        ${hasOrder ? `<button class="${orderBtnCls}" style="padding:2px 12px;font-size:11px" 
-                            onclick='placeOrderFromStrategy(${l.price},${dir},"${s.symbol}",${sAmt},${sTu},"${l.label}")'
-                            title="点击直接下单：${dirText} ${sAmt}USDT ${sTu}min">${dirText}</button>`
-                         : ''}
-                    </div>`;
+                        \${hasOrder ? \`<button class="\${orderBtnCls}" style="padding:2px 12px;font-size:11px"
+                            onclick='placeOrderFromStrategy(\${l.price},\${dir},"\${s.symbol}",\${sAmt},\${sTu},"\${l.label}")'
+                            title="立即手动下单（弹窗确认）">\${dirText}</button>\` : ''}
+                    </div>\`;
                 }).join('')}
             </div>
             <div style="font-size:10px;color:var(--text-muted);margin-top:6px;text-align:right;display:flex;justify-content:space-between;align-items:center">
                 <span>${s.createdAt || ''}</span>
-                ${autoOn ? `<span style="color:var(--accent);font-size:9px">监控中...</span>` : ''}
+                ${autoOn ? `<span style="color:var(--accent);font-size:9px">● 监控中</span>` : ''}
             </div>
         </div>`;
     }).join('');
@@ -1400,10 +1455,29 @@ function toggleAutoTrade(strategyId) {
     s.autoTrade = !s.autoTrade;
     localStorage.setItem('hibt_strategies', JSON.stringify(state.strategies));
     renderStrategies();
-    toast(s.autoTrade ? 'ok' : 'info', `${s.symbol.toUpperCase()} 自动下单已${s.autoTrade ? '启用' : '暂停'}`);
+    toast(s.autoTrade ? 'ok' : 'info', `${s.symbol.toUpperCase()} 自动下单已${s.autoTrade ? '启动' : '停止'}`);
 }
 
-// Auto-monitor: check if current price hits any fib level → auto order
+/** Toggle a single level's monitoring state for a strategy */
+function toggleStrategyLevel(strategyId, pct) {
+    const s = state.strategies.find(x => x.id === strategyId);
+    if (!s) return;
+    if (!s.selectedLevels) {
+        s.selectedLevels = s.trend === 'uptrend' ? [61.8, 78.6, 88.6] : [23.6, 38.2, 61.8];
+    }
+    const idx = s.selectedLevels.indexOf(pct);
+    if (idx >= 0) {
+        s.selectedLevels.splice(idx, 1);
+        toast('info', `${s.symbol.toUpperCase()} ${pct}% 回调位已从监控中移除`);
+    } else {
+        s.selectedLevels.push(pct);
+        toast('ok', `${s.symbol.toUpperCase()} ${pct}% 回调位已加入监控`);
+    }
+    localStorage.setItem('hibt_strategies', JSON.stringify(state.strategies));
+    renderStrategies();
+}
+
+// Auto-monitor: check if current price hits any selected fib level → auto order
 function checkStrategies() {
     if (!state.strategies.length) return;
 
@@ -1416,10 +1490,14 @@ function checkStrategies() {
         if (!priceData || !priceData.price) continue;
         const currentPrice = priceData.price;
 
-        // Check each key fib level
+        // 兼容旧数据（无 selectedLevels 字段）
+        const selectedLvls = s.selectedLevels || (s.trend === 'uptrend' ? [61.8, 78.6, 88.6] : [23.6, 38.2, 61.8]);
+        if (!selectedLvls.length) continue;
+
+        // Check only user-selected fib levels
         for (const l of s.levels) {
-            const isKey = [61.8, 78.6, 88.6, 38.2, 23.6].includes(l.pct);
-            if (!isKey) continue;
+            // 只检测用户指定的回调位
+            if (!selectedLvls.includes(l.pct)) continue;
 
             // Determine direction based on trend
             let dir = 0;
