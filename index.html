@@ -607,6 +607,14 @@ tbody tr:last-child td { border-bottom: none; }
                             </select>
                         </div>
                     </div>
+                    <!-- 自动下单开关 -->
+                    <div style="margin-top:10px;display:flex;align-items:center;gap:10px">
+                        <label style="font-size:11px;font-weight:600;color:var(--text-secondary);display:flex;align-items:center;gap:8px;cursor:pointer">
+                            <input type="checkbox" id="stratAutoTrade" style="width:16px;height:16px;cursor:pointer;accent-color:var(--accent)">
+                            🤖 启用自动下单
+                        </label>
+                        <span style="font-size:10px;color:var(--text-muted)">价格触达回调位时自动交易</span>
+                    </div>
                 </div>
 
                 <!-- Fibonacci preview -->
@@ -688,6 +696,7 @@ const state = {
     strategies: [],
     selectedDir: 1,
     priceTimer: null,
+    triggeredLevels: {},  // { "strategyId_levelPct": timestamp } — 防止重复触发
 };
 
 const SYMBOLS = [
@@ -1264,6 +1273,7 @@ function addStrategy() {
     const sTrend = document.getElementById('stratTrend').value;
     const sAmount = document.getElementById('stratAmount').value || 3;
     const sTimeUnit = document.getElementById('stratTimeUnit').value || 10;
+    const sAutoTrade = document.getElementById('stratAutoTrade').checked;
 
     if (!sHigh || !sLow || isNaN(sHigh) || isNaN(sLow)) { toast('err', '请输入高点和低点'); return; }
     if (sHigh <= sLow) { toast('err', '高点必须大于低点'); return; }
@@ -1278,13 +1288,15 @@ function addStrategy() {
         trend: sTrend,
         amount: sAmount,
         timeUnit: sTimeUnit,
+        autoTrade: sAutoTrade,
         levels: levels,
         createdAt: new Date().toLocaleString(),
     };
     state.strategies.push(strategy);
     renderStrategies();
     localStorage.setItem('hibt_strategies', JSON.stringify(state.strategies));
-    toast('ok', `已保存: ${sSym.toUpperCase()} $${sLow.toLocaleString()} ~ $${sHigh.toLocaleString()} | ${sAmount}USDT ${sTimeUnit}min`);
+    const autoLabel = sAutoTrade ? ' 🤖自动' : '';
+    toast('ok', `已保存: ${sSym.toUpperCase()} $${sLow.toLocaleString()} ~ $${sHigh.toLocaleString()} | ${sAmount}USDT ${sTimeUnit}min${autoLabel}`);
 }
 
 function removeStrategy(id) {
@@ -1305,29 +1317,37 @@ function renderStrategies() {
         const trendColor = s.trend === 'uptrend' ? 'var(--green)' : 'var(--red)';
         const sAmt = s.amount || 3;
         const sTu = s.timeUnit || 10;
+        const autoOn = !!s.autoTrade;
+        // Border glow when auto is on
+        const borderStyle = autoOn ? 'border-color:rgba(88,166,255,0.4);box-shadow:0 0 12px rgba(88,166,255,0.08)' : '';
 
         return `
-        <div style="padding:14px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px">
+        <div style="padding:14px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;${borderStyle}">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:4px">
                 <div style="display:flex;align-items:center;gap:8px">
                     <span style="font-size:13px;font-weight:600">${s.symbol.toUpperCase()}</span>
                     <span style="color:${trendColor};font-size:11px">${trendIcon} ${trendText}</span>
+                    ${autoOn ? '<span style="font-size:9px;background:var(--accent);color:#fff;padding:1px 6px;border-radius:8px;font-weight:700">🤖 自动</span>' : ''}
                     <span style="font-size:11px;color:var(--text-muted)">
                         $${s.low.toLocaleString()} ~ $${s.high.toLocaleString()}
                     </span>
                 </div>
-                <button class="btn btn-outline btn-sm" style="width:auto;padding:3px 10px;font-size:11px" onclick="removeStrategy(${s.id})">删除</button>
+                <div style="display:flex;gap:6px">
+                    <!-- Auto trade toggle -->
+                    <button class="btn btn-sm" style="width:auto;padding:2px 8px;font-size:11px;background:${autoOn?'var(--accent)':'transparent'};color:${autoOn?'#fff':'var(--text-muted)'};border:1px solid ${autoOn?'var(--accent)': 'var(--border)'}"
+                        onclick='toggleAutoTrade(${s.id})' title="${autoOn ? '暂停自动监控' : '启用自动下单'}">${autoOn ? '🤖 运行中' : '⏸ 手动'}</button>
+                    <button class="btn btn-outline btn-sm" style="width:auto;padding:3px 10px;font-size:11px" onclick="removeStrategy(${s.id})">删除</button>
+                </div>
             </div>
             <!-- 下单参数摘要 -->
-            <div style="font-size:10px;color:var(--text-muted);margin-bottom:8px;padding:4px 0;display:flex;gap:12px">
+            <div style="font-size:10px;color:var(--text-muted);margin-bottom:8px;padding:4px 0;display:flex;gap:12px;flex-wrap:wrap">
                 <span>💰 ${sAmt} USDT</span><span>⏱ ${sTu} 分钟</span><span style="color:${trendColor}">方向由回调位自动决定</span>
+                ${autoOn ? `<span style="color:var(--accent)">⚡ 价格触达 ±0.2% 时自动下单</span>` : ''}
             </div>
             <!-- 回调位 + 一键下单按钮 -->
             <div style="display:flex;flex-direction:column;gap:4px">
                 ${s.levels.map(l => {
                     const isKey = [61.8, 78.6, 88.6, 38.2, 23.6].includes(l.pct);
-                    // Uptrend: deep retracement (61.8/78.6/88.6) → buy UP
-                    // Downtrend: shallow retracement (23.6/38.2/61.8) → buy DOWN
                     let dir = 0;
                     if (isKey) {
                         if (s.trend === 'uptrend') {
@@ -1340,11 +1360,23 @@ function renderStrategies() {
                     const dirText = dir === 1 ? '买涨 ⬆️' : (dir === 2 ? '买跌 ⬇️' : '');
                     const orderBtnCls = dir === 1 ? 'fib-buy-up-main' : (dir === 2 ? 'fib-buy-down-main' : '');
 
+                    // Check if this level was recently triggered
+                    const triggerKey = `${s.id}_${l.pct}`;
+                    const triggeredAt = state.triggeredLevels[triggerKey];
+                    let triggerBadge = '';
+                    if (triggeredAt && hasOrder) {
+                        const ago = Math.round((Date.now() - triggeredAt) / 1000);
+                        if (ago < 300) { // within 5 min
+                            triggerBadge = `<span style="font-size:9px;color:var(--accent);background:rgba(88,166,255,0.1);padding:1px 5px;border-radius:6px">✅ 已触发 ${ago}s前</span>`;
+                        }
+                    }
+
                     return `<div style="display:flex;align-items:center;justify-content:space-between;padding:3px 8px;border-radius:6px;${hasOrder ? 'background:rgba(88,166,255,0.06)' : ''}">
                         <div style="display:flex;align-items:center;gap:8px;min-width:0">
                             <span style="font-size:10px;font-weight:${isKey?700:400};color:${isKey?'var(--accent)':'var(--text-muted)'};min-width:42px">${l.label}</span>
                             <span style="font-size:12px;font-weight:500">$${l.price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
                             ${hasOrder ? `<span style="font-size:9px;color:${dir===1?'var(--green)':'var(--red)'}">${dir===1?'📈':'📉'}</span>` : ''}
+                            ${triggerBadge}
                         </div>
                         ${hasOrder ? `<button class="${orderBtnCls}" style="padding:2px 12px;font-size:11px" 
                             onclick='placeOrderFromStrategy(${l.price},${dir},"${s.symbol}",${sAmt},${sTu},"${l.label}")'
@@ -1353,14 +1385,124 @@ function renderStrategies() {
                     </div>`;
                 }).join('')}
             </div>
-            <div style="font-size:10px;color:var(--text-muted);margin-top:6px;text-align:right">${s.createdAt || ''}</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:6px;text-align:right;display:flex;justify-content:space-between;align-items:center">
+                <span>${s.createdAt || ''}</span>
+                ${autoOn ? `<span style="color:var(--accent);font-size:9px">监控中...</span>` : ''}
+            </div>
         </div>`;
     }).join('');
 }
 
-// No more auto-trigger checkStrategies — manual only
+/** Toggle auto-trade for a strategy */
+function toggleAutoTrade(strategyId) {
+    const s = state.strategies.find(x => x.id === strategyId);
+    if (!s) return;
+    s.autoTrade = !s.autoTrade;
+    localStorage.setItem('hibt_strategies', JSON.stringify(state.strategies));
+    renderStrategies();
+    toast(s.autoTrade ? 'ok' : 'info', `${s.symbol.toUpperCase()} 自动下单已${s.autoTrade ? '启用' : '暂停'}`);
+}
+
+// Auto-monitor: check if current price hits any fib level → auto order
 function checkStrategies() {
-    // Keep function for compatibility but do nothing auto-trading
+    if (!state.strategies.length) return;
+
+    for (const s of state.strategies) {
+        // Skip if auto-trade not enabled for this strategy
+        if (!s.autoTrade) continue;
+
+        // Get current price for this symbol
+        const priceData = state.prices[s.symbol];
+        if (!priceData || !priceData.price) continue;
+        const currentPrice = priceData.price;
+
+        // Check each key fib level
+        for (const l of s.levels) {
+            const isKey = [61.8, 78.6, 88.6, 38.2, 23.6].includes(l.pct);
+            if (!isKey) continue;
+
+            // Determine direction based on trend
+            let dir = 0;
+            if (s.trend === 'uptrend') {
+                dir = (l.pct >= 61.8) ? 1 : 0;
+            } else {
+                dir = (l.pct <= 61.8) ? 2 : 0;
+            }
+            if (dir === 0) continue;
+
+            // Check if price is within tolerance of this level
+            const tolerance = l.price * 0.002; // 0.2% tolerance
+            const distance = Math.abs(currentPrice - l.price);
+
+            if (distance <= tolerance) {
+                // Check if already triggered recently (prevent duplicate)
+                const triggerKey = `${s.id}_${l.pct}`;
+                const lastTriggered = state.triggeredLevels[triggerKey];
+                // Don't re-trigger within 5 minutes
+                if (lastTriggered && (Date.now() - lastTriggered < 5 * 60 * 1000)) continue;
+
+                // Mark as triggered
+                state.triggeredLevels[triggerKey] = Date.now();
+
+                // Auto place order (no confirm dialog)
+                autoPlaceOrder(l.price, dir, s.symbol, s.amount || 3, s.timeUnit || 10, l.label, s.id);
+            }
+        }
+    }
+}
+
+// Auto place order without confirm dialog
+async function autoPlaceOrder(price, direction, symbol, amount, timeUnit, label, strategyId) {
+    if (!state.token || !state.key || !state.id) {
+        log('warn', `自动下单跳过: Token 无效 (${label})`);
+        return;
+    }
+
+    const dirText = direction === 1 ? '买涨' : '买跌';
+    const sym = symbol;
+    const amt = amount;
+    const tu = timeUnit;
+
+    log('info', `🤖 自动触发: ${label} $${price.toFixed(2)} → ${dirText} ${sym.toUpperCase()} ${amt}USDT ${tu}min`);
+
+    try {
+        const result = await apiRequest('POST', 'event/event-order/place', {
+            amount: amt,
+            direction: String(direction),
+            symbol: sym,
+            timeUnit: tu,
+            langCode: 'zh_CN',
+        });
+
+        if (result.code === 0 || result.success) {
+            toast('ok', `🤖 自动${dirText} ${sym.toUpperCase()} ${amt}USDT ${tu}min @ ${label}`);
+            log('ok', `🤖 自动下单成功 | ${dirText} ${sym.toUpperCase()} ${amt}USDT ${tu}min @ ${label} $${price.toFixed(2)}`);
+
+            state.orders.unshift({
+                time: new Date().toLocaleString(),
+                symbol: sym.toUpperCase().replace('_', '/'),
+                direction: direction,
+                amount: amt,
+                timeUnit: tu,
+                status: 'submitted',
+                result: '-',
+                auto: true,
+            });
+            renderOrders();
+
+            // Update strategy card to show triggered status
+            renderStrategies();
+        } else {
+            const msg = result.msg || result.message || JSON.stringify(result);
+            toast('err', `🤖 自动下单失败: ${msg}`);
+            log('err', `🤖 自动下单失败: ${msg}`);
+            // Allow retry on next cycle if order failed
+            delete state.triggeredLevels[`${strategyId}_${[61.8,78.6,88.6,38.2,23.6].find(p => label.includes(p))}`];
+        }
+    } catch(e) {
+        log('err', `🤖 自动下单异常: ${e.message}`);
+        // Allow retry
+    }
 }
 
 // ============================================================
