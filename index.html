@@ -868,119 +868,94 @@ function hideTokenModal() {
 }
 
 // ============================================================
-//  Price Monitor (Binance API)
+//  Price Monitor
 // ============================================================
 async function fetchPrices() {
-    const proxy = getProxy();
-    // Use multiple fallback sources for price data
-    const sources = [];
+    const proxy = getProxy(); // e.g. http://127.0.0.1:7890
 
-    // Source 1: Direct Binance API (works if no CORS / network OK)
-    sources.push(async () => {
-        let url = 'https://api.binance.com/api/v3/ticker/24hr?symbols=' +
-            encodeURIComponent(JSON.stringify([
-                'BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT',
-                'DOGEUSDT','XRPUSDT'
-            ]));
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 8000);
-        const resp = await fetch(url, { signal: controller.signal });
-        clearTimeout(timer);
-        if (!resp.ok) throw new Error('Binance HTTP ' + resp.status);
-        return await resp.json();
-    });
-
-    // Source 2: Binance via proxy
-    if (proxy) {
-        sources.push(async () => {
-            let url = 'https://api.binance.com/api/v3/ticker/24hr?symbols=' +
-                encodeURIComponent(JSON.stringify([
-                    'BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT',
-                    'DOGEUSDT','XRPUSDT'
-                ]));
-            const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), 10000);
-            const resp = await fetch(url, {
-                signal: controller.signal,
-                headers: { 'Accept': 'application/json' },
-            });
-            clearTimeout(timer);
-            if (!resp.ok) throw new Error('Binance-proxy HTTP ' + resp.status);
-            return await resp.json();
-        });
-    }
-
-    // Source 3: CoinGecko free API (no auth needed, CORS-friendly)
-    sources.push(async () => {
-        const ids = 'bitcoin,ethereum,solana,binancecoin,dogecoin,ripple';
-        const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true`;
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 10000);
-        const resp = await fetch(url, { signal: controller.signal });
-        clearTimeout(timer);
-        if (!resp.ok) throw new Error('CoinGecko HTTP ' + resp.status);
-        // Convert CoinGecko format to match our mapping
-        const cgData = await resp.json();
-        const cgMapping = {
-            'bitcoin':   { symbol: 'btc_usdt', name: 'BTC' },
-            'ethereum':  { symbol: 'eth_usdt', name: 'ETH' },
-            'solana':    { symbol: 'sol_usdt', name: 'SOL' },
-            'binancecoin':{ symbol: 'bnb_usdt', name: 'BNB' },
-            'dogecoin':  { symbol: 'doge_usdt', name: 'DOGE' },
-            'ripple':    { symbol: 'xrp_usdt', name: 'XRP' },
-        };
-        return Object.entries(cgData).map(([key, val]) => ({
-            symbol: (cgMapping[key] || {}).symbol || key + '_usdt',
-            lastPrice: String(val.usd),
-            priceChangePercent: String(val.usd_24h_change || 0),
-            highPrice: '0',
-            lowPrice: '0',
-            volume: String(val.usd_24h_vol || 0),
-            _source: 'coingecko'
-        }));
-    });
-
-    // Try each source in order
-    let data = null;
-    let lastErr = null;
-    for (let i = 0; i < sources.length; i++) {
+    // ---- Helper: timed fetch ----
+    async function timedFetch(url, timeoutMs) {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), timeoutMs || 8000);
         try {
-            data = await sources[i]();
-            break;
-        } catch(e) {
-            lastErr = e;
-            console.warn(`Price source ${i+1} failed:`, e.message);
+            const r = await fetch(url, { signal: ctrl.signal });
+            clearTimeout(t);
+            return r;
+        } catch(e) { clearTimeout(t); throw e; }
+    }
+
+    const SYMS_JSON = encodeURIComponent(JSON.stringify(['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','DOGEUSDT','XRPUSDT']));
+
+    // ---- Source 1: Binance direct ----
+    try {
+        const resp = await timedFetch(`https://api.binance.com/api/v3/ticker/24hr?symbols=${SYMS_JSON}`, 8000);
+        if (resp.ok) { processBinanceData(await resp.json(), 'Binance'); return; }
+    } catch(e) { log('warn', `Binance 失败: ${e.message}`); }
+
+    // ---- Source 2: Binance.US (different domain) ----
+    try {
+        const resp = await timedFetch(`https://api.binance.us/api/v3/ticker/24hr?symbols=${SYMS_JSON}`, 8000);
+        if (resp.ok) { processBinanceData(await resp.json(), 'Binance.US'); return; }
+    } catch(e) { log('warn', `Binance.US 失败: ${e.message}`); }
+
+    // ---- Source 3: CoinGecko (most CORS-friendly) ----
+    try {
+        const ids = 'bitcoin,ethereum,solana,binancecoin,dogecoin,ripple';
+        const resp = await timedFetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`, 12000);
+        if (resp.ok) {
+            const cgData = await resp.json();
+            const cgMap = {
+                'bitcoin':'btc_usdt','ethereum':'eth_usdt','solana':'sol_usdt',
+                'binancecoin':'bnb_usdt','dogecoin':'doge_usdt','ripple':'xrp_usdt',
+            };
+            let n = 0;
+            Object.entries(cgData).forEach(([key, val]) => {
+                const sym = cgMap[key];
+                if (!sym) return;
+                state.prices[sym] = {
+                    price: parseFloat(val.usd) || 0,
+                    change: parseFloat(val.usd_24h_change) || 0,
+                    high: 0, low: 0, volume: 0,
+                };
+                n++;
+            });
+            if (n > 0) {
+                renderPrices();
+                checkStrategies();
+                document.getElementById('lastUpdate').textContent =
+                    '更新于 ' + new Date().toLocaleTimeString() + ' (CoinGecko)';
+                return;
+            }
         }
-    }
+    } catch(e) { log('warn', `CoinGecko 失败: ${e.message}`); }
 
-    if (!data) {
-        log('err', '所有行情源均失败: ' + (lastErr ? lastErr.message : '未知错误'));
-        return;
-    }
+    log('err', '⚠️ 所有行情源均失败，请检查网络或在设置中配置代理');
+}
 
-    const mapping = {
-        'BTCUSDT': 'btc_usdt', 'ETHUSDT': 'eth_usdt',
-        'SOLUSDT': 'sol_usdt', 'BNBUSDT': 'bnb_usdt',
-        'DOGEUSDT': 'doge_usdt', 'XRPUSDT': 'xrp_usdt'
+function processBinanceData(data, source) {
+    const map = {
+        'BTCUSDT':'btc_usdt','ETHUSDT':'eth_usdt','SOLUSDT':'sol_usdt',
+        'BNBUSDT':'bnb_usdt','DOGEUSDT':'doge_usdt','XRPUSDT':'xrp_usdt'
     };
-
-    data.forEach(item => {
-        const sym = mapping[item.symbol] || item.symbol;
-        if (!sym || sym.indexOf('_usdt') === -1) return; // skip coingecko raw keys that don't match
+    let n = 0;
+    (Array.isArray(data) ? data : [data]).forEach(item => {
+        const sym = map[item.symbol];
+        if (!sym) return;
         state.prices[sym] = {
-            price: parseFloat(item.lastPrice),
-            change: parseFloat(item.priceChangePercent),
-            high: parseFloat(item.highPrice),
-            low: parseFloat(item.lowPrice),
-            volume: parseFloat(item.volume),
+            price: parseFloat(item.lastPrice) || 0,
+            change: parseFloat(item.priceChangePercent) || 0,
+            high: parseFloat(item.highPrice) || 0,
+            low: parseFloat(item.lowPrice) || 0,
+            volume: parseFloat(item.volume) || 0,
         };
+        n++;
     });
-
-    renderPrices();
-    checkStrategies();
-
-    document.getElementById('lastUpdate').textContent =
-        '更新于 ' + new Date().toLocaleTimeString();
+    if (n > 0) {
+        renderPrices();
+        checkStrategies();
+        document.getElementById('lastUpdate').textContent =
+            '更新于 ' + new Date().toLocaleTimeString() + (source ? ` (${source})` : '');
+    }
 }
 
 function renderPrices() {
