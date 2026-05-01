@@ -493,12 +493,14 @@ tbody tr:last-child td { border-bottom: none; }
             <label class="form-label">行情数据源说明</label>
             <div style="font-size:11px;color:var(--text-muted);line-height:1.7;padding:8px 10px;background:var(--bg-input);border-radius:6px;border:1px solid var(--border)">
                 自动按顺序尝试以下数据源：<br>
-                <span style="color:var(--accent)">0. 自建 Cloudflare Worker（填写上方地址后启用）</span><br>
-                1. Binance 直连<br>
-                2. corsproxy.io 中转（GitHub Pages 可用）<br>
-                3. allorigins.win 中转<br>
-                4. Binance.US<br>
-                5. CoinGecko<br>
+                <span style="color:var(--accent)">0. OKX 直连（对国内友好，优先使用）✅</span><br>
+                1. OKX 通过 Worker 中转（填写 Worker 地址后启用）<br>
+                2. Binance 通过 Worker 中转<br>
+                3. Binance 直连<br>
+                4. corsproxy.io 中转（GitHub Pages 可用）<br>
+                5. allorigins.win 中转<br>
+                6. Binance.US<br>
+                7. CoinGecko<br>
                 <span style="color:var(--accent)">● 如仍不显示，可在「运行日志」查看失败原因</span>
             </div>
         </div>
@@ -896,47 +898,105 @@ async function fetchPrices() {
         } catch(e) { clearTimeout(t); throw e; }
     }
 
-    const SYMS = ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','DOGEUSDT','XRPUSDT'];
-    const SYMS_JSON = encodeURIComponent(JSON.stringify(SYMS));
-    const BINANCE_URL = `https://api.binance.com/api/v3/ticker/24hr?symbols=${SYMS_JSON}`;
+    const BINANCE_SYMS = ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','DOGEUSDT','XRPUSDT'];
+    const BINANCE_SYMS_JSON = encodeURIComponent(JSON.stringify(BINANCE_SYMS));
+    const BINANCE_URL = `https://api.binance.com/api/v3/ticker/24hr?symbols=${BINANCE_SYMS_JSON}`;
 
-    // ---- Source 0: 自建 Cloudflare Worker（最优先）----
+    // ============================================================
+    // OKX 公开行情接口（无需 Key，直接访问）
+    // 接口: GET /api/v5/market/tickers?instType=SPOT
+    // 返回: { code:"0", data:[{ instId, last, sPrice24h, high24h, low24h, vol24h }] }
+    // 关键: OKX 公开接口允许跨域，国内访问友好
+    // ============================================================
+    const OKX_INST_IDS = ['BTC-USDT','ETH-USDT','SOL-USDT','BNB-USDT','DOGE-USDT','XRP-USDT'];
+    const OKX_URL = `https://www.okx.com/api/v5/market/tickers?instType=SPOT&instId=${OKX_INST_IDS.join(',')}`;
+
+    // OKX symbol 映射: instId → 内部 symbol key
+    const OKX_MAP = {
+        'BTC-USDT':'btc_usdt','ETH-USDT':'eth_usdt','SOL-USDT':'sol_usdt',
+        'BNB-USDT':'bnb_usdt','DOGE-USDT':'doge_usdt','XRP-USDT':'xrp_usdt'
+    };
+
+    function processOkxData(data) {
+        if (!data || data.code !== '0') return false;
+        let n = 0;
+        (data.data || []).forEach(item => {
+            const sym = OKX_MAP[item.instId];
+            if (!sym) return;
+            const last = parseFloat(item.last) || 0;
+            const sPrice = parseFloat(item.sPx24h) || last; // 24h 前价格
+            const change = sPrice > 0 ? ((last - sPrice) / sPrice) * 100 : 0;
+            state.prices[sym] = {
+                price: last,
+                change: parseFloat(change.toFixed(2)),
+                high: parseFloat(item.high24h) || 0,
+                low: parseFloat(item.low24h) || 0,
+                volume: parseFloat(item.vol24h) || 0,
+            };
+            n++;
+        });
+        if (n > 0) {
+            renderPrices();
+            checkStrategies();
+            document.getElementById('lastUpdate').textContent =
+                '更新于 ' + new Date().toLocaleTimeString() + ' (OKX)';
+            return true;
+        }
+        return false;
+    }
+
+    // ---- Source 0: OKX 直连（最优先，对国内友好，支持跨域）----
+    try {
+        const resp = await timedFetch(OKX_URL, 8000);
+        if (resp.ok) { if (processOkxData(await resp.json())) return; }
+    } catch(e) { log('warn', `OKX 直连失败: ${e.message}`); }
+
+    // ---- Source 1: OKX 通过 Worker 中转 ----
+    if (workerBase) {
+        try {
+            const workerOkxUrl = `${workerBase}/okx-price?instIds=${OKX_INST_IDS.join(',')}`;
+            const resp = await timedFetch(workerOkxUrl, 8000);
+            if (resp.ok) { if (processOkxData(await resp.json())) return; }
+        } catch(e) { log('warn', `OKX Worker 中转失败: ${e.message}`); }
+    }
+
+    // ---- Source 2: 自建 Cloudflare Worker（Binance 中转）----
     const workerBase = (document.getElementById('workerUrl')?.value || '').trim().replace(/\/$/, '');
     if (workerBase) {
         try {
-            const workerUrl = `${workerBase}/price?symbols=${SYMS.join(',')}`;
+            const workerUrl = `${workerBase}/price?symbols=${BINANCE_SYMS.join(',')}`;
             const resp = await timedFetch(workerUrl, 8000);
             if (resp.ok) { processBinanceData(await resp.json(), 'CF Worker'); return; }
         } catch(e) { log('warn', `CF Worker 失败: ${e.message}`); }
     }
 
-    // ---- Source 1: Binance direct ----
+    // ---- Source 2: Binance direct ----
     try {
         const resp = await timedFetch(BINANCE_URL, 6000);
         if (resp.ok) { processBinanceData(await resp.json(), 'Binance'); return; }
     } catch(e) { log('warn', `Binance 直连失败: ${e.message}`); }
 
-    // ---- Source 2: Binance via corsproxy.io (works on GitHub Pages) ----
+    // ---- Source 3: Binance via corsproxy.io ----
     try {
         const proxied = 'https://corsproxy.io/?' + encodeURIComponent(BINANCE_URL);
         const resp = await timedFetch(proxied, 10000);
         if (resp.ok) { processBinanceData(await resp.json(), 'Binance/CORS'); return; }
     } catch(e) { log('warn', `corsproxy.io 失败: ${e.message}`); }
 
-    // ---- Source 3: Binance via allorigins.win ----
+    // ---- Source 4: Binance via allorigins.win ----
     try {
         const proxied = `https://api.allorigins.win/raw?url=${encodeURIComponent(BINANCE_URL)}`;
         const resp = await timedFetch(proxied, 10000);
         if (resp.ok) { processBinanceData(await resp.json(), 'Binance/allorigins'); return; }
     } catch(e) { log('warn', `allorigins 失败: ${e.message}`); }
 
-    // ---- Source 4: Binance.US ----
+    // ---- Source 5: Binance.US ----
     try {
-        const resp = await timedFetch(`https://api.binance.us/api/v3/ticker/24hr?symbols=${SYMS_JSON}`, 8000);
+        const resp = await timedFetch(`https://api.binance.us/api/v3/ticker/24hr?symbols=${BINANCE_SYMS_JSON}`, 8000);
         if (resp.ok) { processBinanceData(await resp.json(), 'Binance.US'); return; }
     } catch(e) { log('warn', `Binance.US 失败: ${e.message}`); }
 
-    // ---- Source 5: CoinGecko ----
+    // ---- Source 6: CoinGecko ----
     try {
         const ids = 'bitcoin,ethereum,solana,binancecoin,dogecoin,ripple';
         const resp = await timedFetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`, 12000);
