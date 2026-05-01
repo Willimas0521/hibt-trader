@@ -4,8 +4,8 @@
  * 功能：
  *   - 中转 Binance / OKX API 请求，解决 GitHub Pages CORS 问题
  *   - 自动添加 CORS 响应头，允许任意域名访问
- *   - 支持 /price      → Binance 行情
- *   - 支持 /okx-price  → OKX 行情（不传 instId，返回全部 SPOT）
+ *   - 支持 /price      → Binance 行情（批量查询）
+ *   - 支持 /okx-price  → OKX 行情（逐个查询，返回聚合结果）
  *   - 支持 /ping       → 健康检查
  *
  * 部署方式：见项目 README
@@ -17,6 +17,8 @@
 const ALLOWED_ORIGIN = '*';  // 可改为 'https://willimas0521.github.io'
 const BINANCE_BASE  = 'https://api.binance.com';
 const OKX_BASE      = 'https://www.okx.com';
+
+const WORKER_OKX_INSTS = ['BTC-USDT','ETH-USDT','SOL-USDT','BNB-USDT','DOGE-USDT','XRP-USDT'];
 
 // ============================================================
 // 主入口
@@ -47,7 +49,7 @@ export default {
 };
 
 // ============================================================
-// /price  — Binance 行情
+// /price — Binance 行情（批量查询）
 // 参数: ?symbols=BTCUSDT,ETHUSDT,...
 // ============================================================
 async function handleBinancePrice(url) {
@@ -63,39 +65,51 @@ async function handleBinancePrice(url) {
     });
 
     if (!resp.ok) {
-      const errText = await resp.text();
-      return corsResponse(JSON.stringify({ error: 'Binance API error', status: resp.status, detail: errText }), 502);
+      return corsResponse(JSON.stringify({ error: 'Binance error', status: resp.status }), 502);
     }
 
     return corsResponse(JSON.stringify(await resp.json()), 200);
   } catch (e) {
-    return corsResponse(JSON.stringify({ error: 'Worker fetch failed', message: e.message }), 500);
+    return corsResponse(JSON.stringify({ error: 'Worker failed', message: e.message }), 500);
   }
 }
 
 // ============================================================
-// /okx-price  — OKX 行情
-// 说明: OKX /market/tickers 不支持逗号分隔 instId，
-//       故不传 instId，返回全部 SPOT ticker，
-//       浏览器侧通过 OKX_MAP 过滤所需品种
+// /okx-price — OKX 行情（逐个查询，返回聚合结果）
+// 说明: 逐个查询每个交易对的 /market/ticker，
+//       合并返回 data 数组，避免全部 SPOT 的巨大数据量
 // ============================================================
 async function handleOkxPrice() {
   try {
-    const apiUrl = `${OKX_BASE}/api/v5/market/tickers?instType=SPOT`;
+    const allData = [];
 
-    const resp = await fetch(apiUrl, {
-      headers: { 'Accept': 'application/json', 'User-Agent': 'CFWorker/1.0' },
-      signal:  AbortSignal.timeout(8000),
-    });
+    for (const inst of WORKER_OKX_INSTS) {
+      const apiUrl = `${OKX_BASE}/api/v5/market/ticker?instId=${encodeURIComponent(inst)}`;
+      try {
+        const resp = await fetch(apiUrl, {
+          headers: { 'Accept': 'application/json', 'User-Agent': 'CFWorker/1.0' },
+          signal: AbortSignal.timeout(6000),
+        });
 
-    if (!resp.ok) {
-      const errText = await resp.text();
-      return corsResponse(JSON.stringify({ error: 'OKX API error', status: resp.status, detail: errText }), 502);
+        if (!resp.ok) continue;
+
+        const json = await resp.json();
+        if (json.code === '0' && json.data && json.data.length > 0) {
+          allData.push(json.data[0]);
+        }
+      } catch (_) {
+        // 单个失败跳过，继续下一个
+      }
     }
 
-    return corsResponse(JSON.stringify(await resp.json()), 200);
+    if (allData.length === 0) {
+      return corsResponse(JSON.stringify({ code: '-1', msg: 'No data' }), 200);
+    }
+
+    return corsResponse(JSON.stringify({ code: '0', data: allData }), 200);
+
   } catch (e) {
-    return corsResponse(JSON.stringify({ error: 'Worker OKX fetch failed', message: e.message }), 500);
+    return corsResponse(JSON.stringify({ error: 'OKX Worker failed', message: e.message }), 500);
   }
 }
 

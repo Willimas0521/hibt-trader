@@ -493,8 +493,8 @@ tbody tr:last-child td { border-bottom: none; }
             <label class="form-label">行情数据源说明</label>
             <div style="font-size:11px;color:var(--text-muted);line-height:1.7;padding:8px 10px;background:var(--bg-input);border-radius:6px;border:1px solid var(--border)">
                 自动按顺序尝试以下数据源：<br>
-                <span style="color:var(--accent)">0. OKX via corsproxy 中转（对国内友好，推荐）✅</span><br>
-                1. OKX / Binance 通过 Worker 中转（填写地址后启用）<br>
+                <span style="color:var(--accent)">0. OKX via allorigins 中转（推荐）✅</span><br>
+                1. OKX 直连（部分环境支持）<br>
                 2. Binance 直连<br>
                 3. corsproxy.io 中转（GitHub Pages 可用）<br>
                 4. allorigins.win 中转<br>
@@ -903,14 +903,14 @@ async function fetchPrices() {
 
     // ============================================================
     // OKX 公开行情接口（无需 Key，直接访问）
-    // 接口: GET /api/v5/market/tickers?instType=SPOT
+    // 接口: GET /api/v5/market/ticker?instId=BTC-USDT  （单交易对）
     // 返回: { code:"0", data:[{ instId, last, open24h, high24h, low24h, volCcy24h }] }
-    // 说明: 不传 instId 时返回全部 SPOT ticker，JS 侧按 OKX_MAP 过滤所需品种
-    // 关键: OKX 公开接口允许跨域，国内访问友好
+    // 说明: 用逐个查询代替全部 ticker，避免返回 1200+ 交易对的巨大数据量
+    // 关键: OKX 无 CORS 头，需通过 CORS 代理访问
     // ============================================================
-    const OKX_URL = `https://www.okx.com/api/v5/market/tickers?instType=SPOT`;
 
-    // OKX symbol 映射: instId → 内部 symbol key
+    const OKX_INSTS = ['BTC-USDT','ETH-USDT','SOL-USDT','BNB-USDT','DOGE-USDT','XRP-USDT'];
+
     const OKX_MAP = {
         'BTC-USDT':'btc_usdt','ETH-USDT':'eth_usdt','SOL-USDT':'sol_usdt',
         'BNB-USDT':'bnb_usdt','DOGE-USDT':'doge_usdt','XRP-USDT':'xrp_usdt'
@@ -923,38 +923,64 @@ async function fetchPrices() {
             const sym = OKX_MAP[item.instId];
             if (!sym) return;
             const last = parseFloat(item.last) || 0;
-            const open24h = parseFloat(item.open24h) || last; // 用 open24h 计算涨跌幅
+            const open24h = parseFloat(item.open24h) || last;
             const change = open24h > 0 ? ((last - open24h) / open24h) * 100 : 0;
             state.prices[sym] = {
                 price: last,
                 change: parseFloat(change.toFixed(2)),
                 high: parseFloat(item.high24h) || 0,
                 low: parseFloat(item.low24h) || 0,
-                volume: parseFloat(item.volCcy24h) || 0,  // volCcy24h = 成交额(USDT)
+                volume: parseFloat(item.volCcy24h) || 0,
             };
             n++;
         });
-        if (n > 0) {
+        if (n > 0) return true;
+        return false;
+    }
+
+    // ---- Source 0: OKX 逐个查询 via allorigins（corsproxy 已 403）----
+    try {
+        let okxOk = true;
+        for (const inst of OKX_INSTS) {
+            if (!okxOk) break;
+            try {
+                const url = `https://www.okx.com/api/v5/market/ticker?instId=${inst}`;
+                const proxied = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+                const resp = await timedFetch(proxied, 10000);
+                if (resp.ok) {
+                    // allorigins 返回的是字符串，需要解析
+                    const text = await resp.text();
+                    processOkxData(JSON.parse(text));
+                } else { okxOk = false; }
+            } catch(e) { log(`warn`, `OKX/allorigins(${inst}): ${e.message}`); okxOk = false; break; }
+        }
+        const gotCount = Object.values(OKX_MAP).filter(s => state.prices[s]?.price > 0).length;
+        if (gotCount >= 3) {
             renderPrices();
             checkStrategies();
             document.getElementById('lastUpdate').textContent =
                 '更新于 ' + new Date().toLocaleTimeString() + ' (OKX)';
-            return true;
+            return;
         }
-        return false;
-    }
+    } catch(e) { log('warn', `OKX 总体失败: ${e.message}`); }
 
-    // ---- Source 0: OKX via corsproxy.io 中转（OKX 无 CORS 头，必须走代理）----
+    // ---- Source 1: OKX 直连（部分环境可能支持）----
     try {
-        const proxied = 'https://corsproxy.io/?' + encodeURIComponent(OKX_URL);
-        const resp = await timedFetch(proxied, 10000);
-        if (resp.ok) { if (processOkxData(await resp.json())) return; }
-    } catch(e) { log('warn', `OKX corsproxy 失败: ${e.message}`); }
-
-    // ---- Source 1: OKX 直连（部分浏览器/环境可能支持）----
-    try {
-        const resp = await timedFetch(OKX_URL, 8000);
-        if (resp.ok) { if (processOkxData(await resp.json())) return; }
+        let gotAny = false;
+        for (const inst of OKX_INSTS) {
+            try {
+                const url = `https://www.okx.com/api/v5/market/ticker?instId=${inst}`;
+                const resp = await timedFetch(url, 8000);
+                if (resp.ok && processOkxData(await resp.json())) { gotAny = true; }
+            } catch(_) {}
+        }
+        const cnt = Object.values(OKX_MAP).filter(s => state.prices[s]?.price > 0).length;
+        if (cnt >= 3 && gotAny) {
+            renderPrices(); checkStrategies();
+            document.getElementById('lastUpdate').textContent =
+                '更新于 ' + new Date().toLocaleTimeString() + ' (OKX直连)';
+            return;
+        }
     } catch(e) { log('warn', `OKX 直连失败: ${e.message}`); }
 
     // ---- Source 1: 自建 Cloudflare Worker（先试 OKX，再试 Binance）----
