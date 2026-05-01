@@ -676,9 +676,16 @@ async function placeOrder(symbol, direction, amountUsdt) {
         timestamp: Date.now().toString(),
     };
     params.sign = hibtSign(params);
-    log('info', `📤 下单请求: ${symbol} ${direction} ${amountUsdt} USDT`);
+
+    // 如果配置了 Worker，走中转（解决 GFW 问题）
+    const workerUrl = localStorage.getItem('workerUrl') || '';
+    const apiUrl = workerUrl
+        ? `${workerUrl}/hibt/api/v1/order`
+        : `${HIBT_API}/api/v1/order`;
+
+    log('info', `📤 下单请求: ${symbol} ${direction} ${amountUsdt} USDT${workerUrl?' (via Worker)':''}`);
     try {
-        const resp = await fetch(`${HIBT_API}/api/v1/order`, {
+        const resp = await fetch(apiUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -771,8 +778,15 @@ async function testHiBTToken() {
     const token = localStorage.getItem('hibt_token') || '';
     if (!token) { alert('请先输入并保存 Token'); return; }
     log('info', '🔍 测试 HiBT 连接…');
+
+    // 如果配置了 Worker，走中转（解决 GFW 问题）
+    const workerUrl = (localStorage.getItem('workerUrl') || '').trim().replace(/\/$/, '');
+    const apiUrl = workerUrl
+        ? `${workerUrl}/hibt/api/v1/account`
+        : `${HIBT_API}/api/v1/account`;
+
     try {
-        const resp = await fetch(`${HIBT_API}/api/v1/account`, {
+        const resp = await fetch(apiUrl, {
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`,
@@ -781,7 +795,7 @@ async function testHiBTToken() {
         });
         const data = await resp.json();
         if (data.code === 0 || data.code === '0') {
-            log('ok', '✅ HiBT Token 有效！连接成功');
+            log('ok', `✅ HiBT Token 有效！连接成功${workerUrl ? ' (via Worker)' : ''}`);
             alert('✅ Token 验证成功，账户连接正常！');
         } else {
             log('err', `❌ Token 无效: ${data.msg || JSON.stringify(data)}`);

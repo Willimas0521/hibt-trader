@@ -16,7 +16,7 @@
 // ============================================================
 const ALLOWED_ORIGIN = '*';  // 可改为 'https://willimas0521.github.io'
 const BINANCE_BASE  = 'https://api.binance.com';
-const OKX_BASE      = 'https://www.okx.com';
+const HIBT_BASE    = 'https://api.hibt.com';
 
 const WORKER_OKX_INSTS = ['BTC-USDT','ETH-USDT','SOL-USDT','BNB-USDT','DOGE-USDT','XRP-USDT'];
 
@@ -42,6 +42,11 @@ export default {
 
     if (path === '/okx-price') {
       return handleOkxPrice();
+    }
+
+    // /hibt/* — HiBT API 中转（解决 GFW 问题）
+    if (path.startsWith('/hibt/')) {
+      return handleHibt(request);
     }
 
     return corsResponse(JSON.stringify({ error: 'Not found', path }), 404);
@@ -110,6 +115,64 @@ async function handleOkxPrice() {
 
   } catch (e) {
     return corsResponse(JSON.stringify({ error: 'OKX Worker failed', message: e.message }), 500);
+  }
+}
+
+// ============================================================
+// /hibt/* — HiBT API 中转（解决 GFW 问题）
+// 说明: 将 /hibt/api/v1/order 转发到 https://api.hibt.com/api/v1/order
+//       保留原始请求方法、Authorization 头、请求体
+// ============================================================
+async function handleHibt(request) {
+  try {
+    const url     = new URL(request.url);
+    const hibtPath = url.pathname.replace(/^\/hibt/, '');  // 去掉 /hibt 前缀
+    const hibtUrl = `${HIBT_BASE}${hibtPath}${url.search}`;
+
+    // 只转发必要的请求头，避免 Host/Content-Length 等引起问题
+    const forwardHeaders = new Headers();
+    forwardHeaders.set('Content-Type', request.headers.get('Content-Type') || 'application/json');
+    const auth = request.headers.get('Authorization');
+    if (auth) forwardHeaders.set('Authorization', auth);
+    forwardHeaders.set('User-Agent', 'CFWorker/1.0');
+    forwardHeaders.set('Accept', 'application/json');
+
+    const init = {
+      method:  request.method,
+      headers: forwardHeaders,
+      redirect: 'follow',
+      signal:  AbortSignal.timeout(10000),
+    };
+
+    // GET/HEAD 不带 body，POST 需要转发 body
+    if (request.method !== 'GET' && request.method !== 'HEAD') {
+      init.body = request.body;
+    }
+
+    const resp = await fetch(hibtUrl, init);
+
+    // 返回 HiBT 的响应，并加上 CORS 头
+    const respBody = await resp.arrayBuffer();
+    const corsHeaders = new Headers();
+    corsHeaders.set('Content-Type',   resp.headers.get('Content-Type') || 'application/json');
+    corsHeaders.set('Access-Control-Allow-Origin',  ALLOWED_ORIGIN);
+    corsHeaders.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    corsHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    corsHeaders.set('Cache-Control',  'no-cache');
+
+    // 透传 HiBT 响应中的其他头
+    const extraHeaders = ['code', 'msg', 'data'];
+    for (const h of extraHeaders) {
+      const v = resp.headers.get(h);
+      if (v) corsHeaders.set(h, v);
+    }
+
+    return new Response(respBody, {
+      status:  resp.status,
+      headers: corsHeaders,
+    });
+  } catch (e) {
+    return corsResponse(JSON.stringify({ error: 'HiBT Worker failed', message: e.message }), 500);
   }
 }
 
