@@ -494,13 +494,12 @@ tbody tr:last-child td { border-bottom: none; }
             <div style="font-size:11px;color:var(--text-muted);line-height:1.7;padding:8px 10px;background:var(--bg-input);border-radius:6px;border:1px solid var(--border)">
                 自动按顺序尝试以下数据源：<br>
                 <span style="color:var(--accent)">0. OKX 直连（对国内友好，优先使用）✅</span><br>
-                1. OKX 通过 Worker 中转（填写 Worker 地址后启用）<br>
-                2. Binance 通过 Worker 中转<br>
-                3. Binance 直连<br>
-                4. corsproxy.io 中转（GitHub Pages 可用）<br>
-                5. allorigins.win 中转<br>
-                6. Binance.US<br>
-                7. CoinGecko<br>
+                1. OKX / Binance 通过 Worker 中转（填写地址后启用）<br>
+                2. Binance 直连<br>
+                3. corsproxy.io 中转（GitHub Pages 可用）<br>
+                4. allorigins.win 中转<br>
+                5. Binance.US<br>
+                6. CoinGecko<br>
                 <span style="color:var(--accent)">● 如仍不显示，可在「运行日志」查看失败原因</span>
             </div>
         </div>
@@ -905,7 +904,7 @@ async function fetchPrices() {
     // ============================================================
     // OKX 公开行情接口（无需 Key，直接访问）
     // 接口: GET /api/v5/market/tickers?instType=SPOT
-    // 返回: { code:"0", data:[{ instId, last, sPx24h, high24h, low24h, vol24h }] }
+    // 返回: { code:"0", data:[{ instId, last, open24h, high24h, low24h, volCcy24h }] }
     // 说明: 不传 instId 时返回全部 SPOT ticker，JS 侧按 OKX_MAP 过滤所需品种
     // 关键: OKX 公开接口允许跨域，国内访问友好
     // ============================================================
@@ -924,14 +923,14 @@ async function fetchPrices() {
             const sym = OKX_MAP[item.instId];
             if (!sym) return;
             const last = parseFloat(item.last) || 0;
-            const sPrice = parseFloat(item.sPx24h) || last; // 24h 前价格
-            const change = sPrice > 0 ? ((last - sPrice) / sPrice) * 100 : 0;
+            const open24h = parseFloat(item.open24h) || last; // 用 open24h 计算涨跌幅
+            const change = open24h > 0 ? ((last - open24h) / open24h) * 100 : 0;
             state.prices[sym] = {
                 price: last,
                 change: parseFloat(change.toFixed(2)),
                 high: parseFloat(item.high24h) || 0,
                 low: parseFloat(item.low24h) || 0,
-                volume: parseFloat(item.vol24h) || 0,
+                volume: parseFloat(item.volCcy24h) || 0,  // volCcy24h = 成交额(USDT)
             };
             n++;
         });
@@ -951,24 +950,19 @@ async function fetchPrices() {
         if (resp.ok) { if (processOkxData(await resp.json())) return; }
     } catch(e) { log('warn', `OKX 直连失败: ${e.message}`); }
 
-    // ---- Source 1: OKX 通过 Worker 中转 ----
-    if (workerBase) {
-        try {
-            // 不传 instIds，Worker 返回全部 SPOT ticker，浏览器侧过滤
-            const workerOkxUrl = `${workerBase}/okx-price`;
-            const resp = await timedFetch(workerOkxUrl, 8000);
-            if (resp.ok) { if (processOkxData(await resp.json())) return; }
-        } catch(e) { log('warn', `OKX Worker 中转失败: ${e.message}`); }
-    }
-
-    // ---- Source 2: 自建 Cloudflare Worker（Binance 中转）----
+    // ---- Source 1: 自建 Cloudflare Worker（先试 OKX，再试 Binance）----
     const workerBase = (document.getElementById('workerUrl')?.value || '').trim().replace(/\/$/, '');
     if (workerBase) {
         try {
-            const workerUrl = `${workerBase}/price?symbols=${BINANCE_SYMS.join(',')}`;
-            const resp = await timedFetch(workerUrl, 8000);
-            if (resp.ok) { processBinanceData(await resp.json(), 'CF Worker'); return; }
-        } catch(e) { log('warn', `CF Worker 失败: ${e.message}`); }
+            // 先用 Worker 中转 OKX
+            const respOkx = await timedFetch(`${workerBase}/okx-price`, 8000);
+            if (respOkx.ok && processOkxData(await respOkx.json())) return;
+        } catch(e) { log('warn', `OKX Worker 中转失败: ${e.message}`); }
+        try {
+            // 再用 Worker 中转 Binance
+            const respBin = await timedFetch(`${workerBase}/price?symbols=${BINANCE_SYMS.join(',')}`, 8000);
+            if (respBin.ok) { processBinanceData(await respBin.json(), 'CF Worker'); return; }
+        } catch(e) { log('warn', `CF Worker Binance 失败: ${e.message}`); }
     }
 
     // ---- Source 2: Binance direct ----
