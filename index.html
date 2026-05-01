@@ -485,8 +485,16 @@ tbody tr:last-child td { border-bottom: none; }
             </select>
         </div>
         <div class="form-group">
-            <label class="form-label">代理设置</label>
-            <input type="text" class="form-input" id="proxyUrl" value="http://127.0.0.1:7890" placeholder="留空则不使用代理">
+            <label class="form-label">行情数据源说明</label>
+            <div style="font-size:11px;color:var(--text-muted);line-height:1.7;padding:8px 10px;background:var(--bg-input);border-radius:6px;border:1px solid var(--border)">
+                自动按顺序尝试以下数据源：<br>
+                1. Binance 直连<br>
+                2. corsproxy.io 中转（GitHub Pages 可用）<br>
+                3. allorigins.win 中转<br>
+                4. Binance.US<br>
+                5. CoinGecko<br>
+                <span style="color:var(--accent)">● 如仍不显示，可在「运行日志」查看失败原因</span>
+            </div>
         </div>
         <button class="btn btn-outline btn-sm" onclick="saveSettings()">💾 保存配置</button>
     </div>
@@ -735,8 +743,8 @@ function makeV() {
 //  API Helper
 // ============================================================
 function getProxy() {
-    const p = document.getElementById('proxyUrl')?.value?.trim();
-    return p || null;
+    // Browser fetch does not support HTTP proxy — always return null
+    return null;
 }
 
 async function apiRequest(method, endpoint, data, params) {
@@ -871,8 +879,6 @@ function hideTokenModal() {
 //  Price Monitor
 // ============================================================
 async function fetchPrices() {
-    const proxy = getProxy(); // e.g. http://127.0.0.1:7890
-
     // ---- Helper: timed fetch ----
     async function timedFetch(url, timeoutMs) {
         const ctrl = new AbortController();
@@ -884,21 +890,37 @@ async function fetchPrices() {
         } catch(e) { clearTimeout(t); throw e; }
     }
 
-    const SYMS_JSON = encodeURIComponent(JSON.stringify(['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','DOGEUSDT','XRPUSDT']));
+    const SYMS = ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','DOGEUSDT','XRPUSDT'];
+    const SYMS_JSON = encodeURIComponent(JSON.stringify(SYMS));
+    const BINANCE_URL = `https://api.binance.com/api/v3/ticker/24hr?symbols=${SYMS_JSON}`;
 
     // ---- Source 1: Binance direct ----
     try {
-        const resp = await timedFetch(`https://api.binance.com/api/v3/ticker/24hr?symbols=${SYMS_JSON}`, 8000);
+        const resp = await timedFetch(BINANCE_URL, 6000);
         if (resp.ok) { processBinanceData(await resp.json(), 'Binance'); return; }
-    } catch(e) { log('warn', `Binance 失败: ${e.message}`); }
+    } catch(e) { log('warn', `Binance 直连失败: ${e.message}`); }
 
-    // ---- Source 2: Binance.US (different domain) ----
+    // ---- Source 2: Binance via corsproxy.io (works on GitHub Pages) ----
+    try {
+        const proxied = 'https://corsproxy.io/?' + encodeURIComponent(BINANCE_URL);
+        const resp = await timedFetch(proxied, 10000);
+        if (resp.ok) { processBinanceData(await resp.json(), 'Binance/CORS'); return; }
+    } catch(e) { log('warn', `corsproxy.io 失败: ${e.message}`); }
+
+    // ---- Source 3: Binance via allorigins.win ----
+    try {
+        const proxied = `https://api.allorigins.win/raw?url=${encodeURIComponent(BINANCE_URL)}`;
+        const resp = await timedFetch(proxied, 10000);
+        if (resp.ok) { processBinanceData(await resp.json(), 'Binance/allorigins'); return; }
+    } catch(e) { log('warn', `allorigins 失败: ${e.message}`); }
+
+    // ---- Source 4: Binance.US ----
     try {
         const resp = await timedFetch(`https://api.binance.us/api/v3/ticker/24hr?symbols=${SYMS_JSON}`, 8000);
         if (resp.ok) { processBinanceData(await resp.json(), 'Binance.US'); return; }
     } catch(e) { log('warn', `Binance.US 失败: ${e.message}`); }
 
-    // ---- Source 3: CoinGecko (most CORS-friendly) ----
+    // ---- Source 5: CoinGecko ----
     try {
         const ids = 'bitcoin,ethereum,solana,binancecoin,dogecoin,ripple';
         const resp = await timedFetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`, 12000);
@@ -929,7 +951,7 @@ async function fetchPrices() {
         }
     } catch(e) { log('warn', `CoinGecko 失败: ${e.message}`); }
 
-    log('err', '⚠️ 所有行情源均失败，请检查网络或在设置中配置代理');
+    log('err', '⚠️ 所有行情源均失败，请检查网络连接');
 }
 
 function processBinanceData(data, source) {
@@ -1598,14 +1620,11 @@ function toast(type, msg) {
 //  Settings
 // ============================================================
 function saveSettings() {
-    localStorage.setItem('hibt_proxy', getProxy());
     localStorage.setItem('hibt_interval', document.getElementById('priceInterval').value);
     toast('ok', '配置已保存');
 }
 
 function loadSettings() {
-    const savedProxy = localStorage.getItem('hibt_proxy');
-    if (savedProxy) document.getElementById('proxyUrl').value = savedProxy;
     const savedInt = localStorage.getItem('hibt_interval');
     if (savedInt) document.getElementById('priceInterval').value = savedInt;
 }
