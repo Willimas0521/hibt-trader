@@ -485,9 +485,15 @@ tbody tr:last-child td { border-bottom: none; }
             </select>
         </div>
         <div class="form-group">
+            <label class="form-label">自定义 Worker 地址 <span style="color:var(--text-muted);font-weight:400">（可选，最高优先级）</span></label>
+            <input class="form-input" type="text" id="workerUrl" placeholder="https://your-worker.your-name.workers.dev" style="font-size:12px">
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">填写后行情请求优先走自建 Cloudflare Worker，稳定性最佳</div>
+        </div>
+        <div class="form-group">
             <label class="form-label">行情数据源说明</label>
             <div style="font-size:11px;color:var(--text-muted);line-height:1.7;padding:8px 10px;background:var(--bg-input);border-radius:6px;border:1px solid var(--border)">
                 自动按顺序尝试以下数据源：<br>
+                <span style="color:var(--accent)">0. 自建 Cloudflare Worker（填写上方地址后启用）</span><br>
                 1. Binance 直连<br>
                 2. corsproxy.io 中转（GitHub Pages 可用）<br>
                 3. allorigins.win 中转<br>
@@ -893,6 +899,16 @@ async function fetchPrices() {
     const SYMS = ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','DOGEUSDT','XRPUSDT'];
     const SYMS_JSON = encodeURIComponent(JSON.stringify(SYMS));
     const BINANCE_URL = `https://api.binance.com/api/v3/ticker/24hr?symbols=${SYMS_JSON}`;
+
+    // ---- Source 0: 自建 Cloudflare Worker（最优先）----
+    const workerBase = (document.getElementById('workerUrl')?.value || '').trim().replace(/\/$/, '');
+    if (workerBase) {
+        try {
+            const workerUrl = `${workerBase}/price?symbols=${SYMS.join(',')}`;
+            const resp = await timedFetch(workerUrl, 8000);
+            if (resp.ok) { processBinanceData(await resp.json(), 'CF Worker'); return; }
+        } catch(e) { log('warn', `CF Worker 失败: ${e.message}`); }
+    }
 
     // ---- Source 1: Binance direct ----
     try {
@@ -1621,12 +1637,19 @@ function toast(type, msg) {
 // ============================================================
 function saveSettings() {
     localStorage.setItem('hibt_interval', document.getElementById('priceInterval').value);
+    const wu = (document.getElementById('workerUrl')?.value || '').trim();
+    if (wu) localStorage.setItem('hibt_worker_url', wu);
+    else localStorage.removeItem('hibt_worker_url');
     toast('ok', '配置已保存');
 }
 
 function loadSettings() {
     const savedInt = localStorage.getItem('hibt_interval');
     if (savedInt) document.getElementById('priceInterval').value = savedInt;
+    const savedWorker = localStorage.getItem('hibt_worker_url');
+    if (savedWorker && document.getElementById('workerUrl')) {
+        document.getElementById('workerUrl').value = savedWorker;
+    }
 }
 
 // ============================================================
