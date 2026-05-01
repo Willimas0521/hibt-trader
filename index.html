@@ -905,11 +905,11 @@ async function fetchPrices() {
     // ============================================================
     // OKX 公开行情接口（无需 Key，直接访问）
     // 接口: GET /api/v5/market/tickers?instType=SPOT
-    // 返回: { code:"0", data:[{ instId, last, sPrice24h, high24h, low24h, vol24h }] }
+    // 返回: { code:"0", data:[{ instId, last, sPx24h, high24h, low24h, vol24h }] }
+    // 说明: 不传 instId 时返回全部 SPOT ticker，JS 侧按 OKX_MAP 过滤所需品种
     // 关键: OKX 公开接口允许跨域，国内访问友好
     // ============================================================
-    const OKX_INST_IDS = ['BTC-USDT','ETH-USDT','SOL-USDT','BNB-USDT','DOGE-USDT','XRP-USDT'];
-    const OKX_URL = `https://www.okx.com/api/v5/market/tickers?instType=SPOT&instId=${OKX_INST_IDS.join(',')}`;
+    const OKX_URL = `https://www.okx.com/api/v5/market/tickers?instType=SPOT`;
 
     // OKX symbol 映射: instId → 内部 symbol key
     const OKX_MAP = {
@@ -954,7 +954,8 @@ async function fetchPrices() {
     // ---- Source 1: OKX 通过 Worker 中转 ----
     if (workerBase) {
         try {
-            const workerOkxUrl = `${workerBase}/okx-price?instIds=${OKX_INST_IDS.join(',')}`;
+            // 不传 instIds，Worker 返回全部 SPOT ticker，浏览器侧过滤
+            const workerOkxUrl = `${workerBase}/okx-price`;
             const resp = await timedFetch(workerOkxUrl, 8000);
             if (resp.ok) { if (processOkxData(await resp.json())) return; }
         } catch(e) { log('warn', `OKX Worker 中转失败: ${e.message}`); }
