@@ -493,11 +493,10 @@ tbody tr:last-child td { border-bottom: none; }
             <label class="form-label">行情数据源说明</label>
             <div style="font-size:11px;color:var(--text-muted);line-height:1.7;padding:8px 10px;background:var(--bg-input);border-radius:6px;border:1px solid var(--border)">
                 自动按顺序尝试以下数据源：<br>
-                <span style="color:var(--green)">0. Binance API 直连（主数据源）✅</span><br>
-                1. allorigins.win 中转 Binance<br>
-                2. Cloudflare Worker 自建中转<br>
-                3. CoinGecko fallback<br>
-                <span style="color:var(--accent)">● Binance 公开API支持CORS，GitHub Pages可直接访问</span>
+                <span style="color:var(--green)">0. data-api.binance.vision（主数据源）✅</span><br>
+                1. 单交易对逐个查询（批量限流时降级）<br>
+                2. CoinGecko fallback<br>
+                <span style="color:var(--accent)">● 使用 Binance 数据域名(非api.binance.com)，国内可直连且支持CORS</span>
             </div>
         </div>
         <button class="btn btn-outline btn-sm" onclick="saveSettings()">💾 保存配置</button>
@@ -885,11 +884,16 @@ function hideTokenModal() {
 // ============================================================
 //  Price Monitor — Binance API (主数据源, 支持CORS)
 // ============================================================
+// ============================================================
+//  Price Monitor — Binance Data API (data-api.binance.vision)
+//  注意: api.binance.com 在中国大陆被墙, 改用 data-api.binance.vision
+//  该域名: ①国内可访问 ②支持CORS(Access-Control-Allow-Origin: *) ③数据格式与api.binance.com完全一致
+// ============================================================
 async function fetchPrices() {
     // ---- Helper: timed fetch ----
     async function timedFetch(url, timeoutMs) {
         const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), timeoutMs || 8000);
+        const t = setTimeout(() => ctrl.abort(), timeoutMs || 10000);
         try {
             const r = await fetch(url, { signal: ctrl.signal });
             clearTimeout(t);
@@ -897,62 +901,59 @@ async function fetchPrices() {
         } catch(e) { clearTimeout(t); throw e; }
     }
 
+    // 使用 data-api.binance.vision (国内可达, 支持CORS, 数据格式同 api.binance.com)
+    const BINANCE_API = 'https://data-api.binance.vision/api/v3';
     const BINANCE_SYMS = ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','DOGEUSDT','XRPUSDT'];
-    const BINANCE_SYMS_JSON = encodeURIComponent(JSON.stringify(BINANCE_SYMS));
-    const BINANCE_URL = `https://api.binance.com/api/v3/ticker/24hr?symbols=${BINANCE_SYMS_JSON}`;
 
     // ================================================================
-    // Source 0: Binance API 直连（主数据源）
-    // Binance 公开 API 支持 CORS（Access-Control-Allow-Origin: *），
-    // GitHub Pages 可直接访问，无需代理或中转
-    // 接口: GET /api/v3/ticker/24hr?symbols=["BTCUSDT","ETHUSDT",...]
+    // Source 0: data-api.binance.vision 批量查询（主数据源）
+    // GET /api/v3/ticker/24hr?symbols=["BTCUSDT","ETHUSDT",...]
     // 返回: [{ symbol, lastPrice, priceChangePercent, highPrice, lowPrice, volume }, ...]
     // ================================================================
     try {
-        const resp = await timedFetch(BINANCE_URL, 8000);
+        const symsJson = encodeURIComponent(JSON.stringify(BINANCE_SYMS));
+        const url = `${BINANCE_API}/ticker/24hr?symbols=${symsJson}`;
+        const resp = await timedFetch(url, 10000);
         if (resp.ok) {
             const data = await resp.json();
             processBinanceData(data, 'Binance');
             return;
         }
-        log('warn', `Binance 直连返回状态: ${resp.status}`);
+        log('warn', `Binance 返回状态: ${resp.status}`);
     } catch(e) {
-        log('warn', `Binance 直连失败: ${e.message}`);
+        log('warn', `Binance 请求失败: ${e.message}`);
     }
 
     // ================================================================
-    // Source 1: allorigins.win 中转 Binance
-    // 如果直连被网络环境拦截，尝试 CORS 代理中转
+    // Source 1: 逐个单交易对查询（批量接口限流时的降级方案）
     // ================================================================
     try {
-        const proxied = `https://api.allorigins.win/raw?url=${encodeURIComponent(BINANCE_URL)}`;
-        const resp = await timedFetch(proxied, 10000);
-        if (resp.ok) {
-            const text = await resp.text();
-            processBinanceData(JSON.parse(text), 'Binance/allorigins');
-            return;
+        let okCount = 0;
+        for (const sym of BINANCE_SYMS) {
+            try {
+                const url = `${BINANCE_API}/ticker/24hr?symbol=${sym}`;
+                const resp = await timedFetch(url, 5000);
+                if (resp.ok) {
+                    const item = await resp.json();
+                    processBinanceData([item], 'Binance');
+                    okCount++;
+                }
+            } catch(_) {}
+            // 短暂延迟避免触发限流
+            await new Promise(r => setTimeout(r, 200));
         }
-    } catch(e) { log('warn', `allorigins 中转失败: ${e.message}`); }
+        if (okCount >= 3) return;
+    } catch(e) { log('warn', `逐个查询失败: ${e.message}`); }
 
     // ================================================================
-    // Source 2: Cloudflare Worker 自建中转
-    // 用户可在设置面板填写 Worker URL，走自建服务
-    // ================================================================
-    const workerBase = (document.getElementById('workerUrl')?.value || '').trim().replace(/\/$/, '');
-    if (workerBase) {
-        try {
-            const respBin = await timedFetch(`${workerBase}/price?symbols=${BINANCE_SYMS.join(',')}`, 8000);
-            if (respBin.ok) { processBinanceData(await respBin.json(), 'CF Worker'); return; }
-        } catch(e) { log('warn', `CF Worker 失败: ${e.message}`); }
-    }
-
-    // ================================================================
-    // Source 3: CoinGecko fallback
-    // 最终兜底方案：免费但可能限速，且字段较少（无高低量）
+    // Source 2: CoinGecko fallback
     // ================================================================
     try {
         const ids = 'bitcoin,ethereum,solana,binancecoin,dogecoin,ripple';
-        const resp = await timedFetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`, 12000);
+        const resp = await timedFetch(
+            `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true`,
+            12000
+        );
         if (resp.ok) {
             const cgData = await resp.json();
             const cgMap = {
@@ -971,8 +972,7 @@ async function fetchPrices() {
                 n++;
             });
             if (n > 0) {
-                renderPrices();
-                checkStrategies();
+                renderPrices(); checkStrategies();
                 document.getElementById('lastUpdate').textContent =
                     '更新于 ' + new Date().toLocaleTimeString() + ' (CoinGecko)';
                 return;
@@ -980,7 +980,7 @@ async function fetchPrices() {
         }
     } catch(e) { log('warn', `CoinGecko 失败: ${e.message}`); }
 
-    log('err', '⚠️ 所有行情源均失败，请检查网络连接');
+    log('err', '⚠️ 所有行情源均失败');
 }
 
 function processBinanceData(data, source) {
