@@ -11,8 +11,7 @@
     --accent: #58a6ff; --green: #3fb950; --red: #f85149; --yellow: #d29922;
 }
 * { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:-apple-system,BlinkMacSystemFont,'Segox UI',Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text); line-height:1.5; min-height:100vh; }
-a { color:var(--accent); text-decoration:none; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text); line-height:1.5; min-height:100vh; }
 
 /* Header */
 .header { background:var(--bg2); border-bottom:1px solid var(--border); padding:12px 20px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; }
@@ -32,14 +31,17 @@ a { color:var(--accent); text-decoration:none; }
 /* Form */
 label { display:block; font-size:12px; color:var(--text2); margin-bottom:4px; }
 input,select,button { font-family:inherit; font-size:13px; }
-input,select {
+input,select{
     width:100%; padding:8px 10px; background:var(--bg4); border:1px solid var(--border);
-    border-radius:6px; color:var(--text); outline:none; margin-bottom:10px;
+    border-radius:6px; color:var(--text); outline:none;
 }
 input:focus,select:focus { border-color:var(--accent); }
+input.no-mb{ margin-bottom:0; }
+select.no-mb{ margin-bottom:0; }
+
 button {
     padding:8px 16px; border:none; border-radius:6px; cursor:pointer;
-    font-weight:600; font-size:13px; transition:0.15s;
+    font-weight:600; font-size:13px; transition:0.15s; white-space:nowrap;
 }
 button:active { transform:scale(0.97); }
 
@@ -51,6 +53,8 @@ button:active { transform:scale(0.97); }
 .btn-red:hover { background:#ff6b6b; }
 .btn-sm { padding:4px 10px; font-size:11px; }
 .btn-xs { padding:2px 8px; font-size:10px; border-radius:4px; }
+.btn-outline { background:transparent; color:var(--text2); border:1px solid var(--border); }
+.btn-outline:hover { border-color:var(--accent); color:var(--accent); }
 
 /* Table */
 table { width:100%; border-collapse:collapse; font-size:12px; }
@@ -69,32 +73,34 @@ td { padding:6px 8px; border-bottom:1px solid var(--border); }
 .chg-up { color:var(--green); background:rgba(63,185,80,0.15); }
 .chg-dn { color:var(--red); background:rgba(248,81,73,0.15); }
 
-/* Fib Levels */
-.fib-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:6px; margin-top:10px; }
-.fib-item {
-    background:var(--bg3); border:1px solid var(--border); border-radius:6px; padding:8px;
-    display:flex; justify-content:space-between; align-items:center; font-size:12px;
-}
-.fib-pct { font-weight:700; }
-.fib-price { font-family:monospace; }
+/* Fib Level Row (with inputs) */
+.fib-table { width:100%; font-size:12px; margin-top:10px; }
+.fib-table th { padding:5px 6px; font-size:11px; color:var(--text3); }
+.fib-table td { padding:4px 5px; vertical-align:middle; border-bottom:1px solid var(--border); }
+.fib-pct-label { font-weight:700; font-size:11px; }
+.fib-golden { color:var(--yellow) !important; }
+.fib-price-cell { font-family:monospace; font-size:12px; min-width:80px; }
+.fib-dir-sel { padding:4px 4px; font-size:11px !important; width:85px; margin-bottom:0; }
+.fib-amount-input { padding:4px 6px; font-size:11px !important; width:65px; text-align:center; margin-bottom:0; }
+.fib-action-btn { padding:3px 8px; font-size:10px; margin-bottom:0; width:100%; }
+.fib-row-active { background:rgba(88,166,255,0.06); }
+.fib-row-added td { opacity:0.6; pointer-events:none; }
 
-/* Strategy */
-.strategy-card {
+/* Pending Order Card */
+.order-card {
     background:var(--bg3); border:1px solid var(--border); border-radius:8px;
-    padding:12px; margin-bottom:8px; font-size:12px;
+    padding:10px 12px; margin-bottom:6px; font-size:12px;
 }
-.strategy-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
-.strategy-name { font-weight:700; font-size:14px; }
+.order-card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+.order-card-title { font-weight:700; font-size:13px; }
+.order-card-detail { color:var(--text2); font-size:11px; margin-bottom:6px; }
+.order-card-actions { display:flex; gap:4px; flex-wrap:wrap; }
+
 .badge { font-size:10px; padding:2px 6px; border-radius:4px; font-weight:600; }
 .badge-green { background:rgba(63,185,80,0.2); color:var(--green); }
 .badge-red { background:rgba(248,81,73,0.2); color:var(--red); }
 .badge-yellow { background:rgba(210,153,34,0.2); color:var(--yellow); }
-
-.level-tag {
-    display:inline-block; font-size:10px; padding:1px 5px; border-radius:3px;
-    border:1px solid var(--border); margin:2px; cursor:pointer;
-}
-.level-tag.active { background:rgba(88,166,255,0.2); border-color:var(--accent); color:var(--accent); }
+.badge-gray { background:rgba(110,118,129,0.2); color:var(--text3); }
 
 /* Log */
 #logBox { background:#0d1117; border:1px solid var(--border); border-radius:6px; padding:8px 10px; height:200px; overflow-y:auto; font-family:monospace; font-size:11px; line-height:1.6; }
@@ -110,7 +116,6 @@ td { padding:6px 8px; border-bottom:1px solid var(--border); }
 .flex { display:flex; gap:8px; align-items:center; }
 .flex-between { display:flex; justify-content:space-between; align-items:center; }
 .text-muted { color:var(--text3); font-size:11px; }
-.text-secondary { color:var(--text2); }
 hr { border:none; border-top:1px solid var(--border); margin:12px 0; }
 </style>
 </head>
@@ -121,7 +126,7 @@ hr { border:none; border-top:1px solid var(--border); margin:12px 0; }
         <div class="logo">H</div>
         <div>
             <div class="title">HiBT Auto Trader</div>
-            <div class="subtitle">Fibonacci · Auto Trade · GitHub Pages</div>
+            <div class="subtitle">挂单 · 斐波那契回调位 · 自动下单</div>
         </div>
     </div>
     <div style="display:flex;align-items:center;gap:12px">
@@ -139,8 +144,9 @@ hr { border:none; border-top:1px solid var(--border); margin:12px 0; }
 
 <div class="main">
 
-    <!-- LEFT: Price + Fib Calculator -->
+    <!-- LEFT COLUMN -->
     <div>
+
         <!-- Live Prices -->
         <div class="card mb">
             <div class="card-hd">📊 实时行情 <span id="lastUpdate" style="margin-left:auto;font-size:11px;color:var(--text3)">—</span></div>
@@ -152,43 +158,12 @@ hr { border:none; border-top:1px solid var(--border); margin:12px 0; }
             </div>
         </div>
 
-        <!-- Fib Calculator -->
+        <!-- Fibonacci Callback Order (Enhanced) -->
         <div class="card mb">
-            <div class="card-hd">📐 斐波那契回调位计算</div>
+            <div class="card-hd">📐 斐波那契回调位下单</div>
             <div class="card-bd">
                 <label>交易对</label>
-                <select id="fibSymbol">
-                    <option value="btc_usdt">BTC/USDT</option>
-                    <option value="eth_usdt">ETH/USDT</option>
-                    <option value="sol_usdt">SOL/USDT</option>
-                    <option value="bnb_usdt">BNB/USDT</option>
-                    <option value="doge_usdt">DOGE/USDT</option>
-                    <option value="xrp_usdt">XRP/USDT</option>
-                </select>
-                <div class="flex" style="gap:10px">
-                    <div style="flex:1">
-                        <label>波段高点 ($)</label>
-                        <input type="number" id="fibHigh" placeholder="例: 70000" step="any">
-                    </div>
-                    <div style="flex:1">
-                        <label>波段低点 ($)</label>
-                        <input type="number" id="fibLow" placeholder="例: 60000" step="any">
-                    </div>
-                </div>
-                <div class="flex" style="gap:10px;margin-top:4px">
-                    <button class="btn-primary" onclick="calcFib()" style="flex:1">计算回调位</button>
-                    <button class="btn-green" onclick="autoFillPrice()" style="flex:1">自动填入当前价格</button>
-                </div>
-                <div id="fibResult" class="mt"></div>
-            </div>
-        </div>
-
-        <!-- Manual Order -->
-        <div class="card">
-            <div class="card-hd">⚡ 手动下单</div>
-            <div class="card-bd">
-                <label>交易对</label>
-                <select id="orderSymbol">
+                <select id="fibSymbol" class="no-mb">
                     <option value="BTC-USDT">BTC/USDT</option>
                     <option value="ETH-USDT">ETH/USDT</option>
                     <option value="SOL-USDT">SOL/USDT</option>
@@ -196,110 +171,111 @@ hr { border:none; border-top:1px solid var(--border); margin:12px 0; }
                     <option value="DOGE-USDT">DOGE/USDT</option>
                     <option value="XRP-USDT">XRP/USDT</option>
                 </select>
-                <div class="flex" style="gap:10px">
+
+                <div class="flex mt" style="gap:10px">
                     <div style="flex:1">
-                        <label>方向</label>
-                        <select id="orderDir"><option value="BUY">📈 做多 BUY</option><option value="SELL">📉 做空 SELL</option></select>
+                        <label>波段高点 ($)</label>
+                        <input type="number" id="fibHigh" placeholder="例: 70000" step="any" no-mb>
+                    </div>
+                    <div style="flex:1">
+                        <label>波段低点 ($)</label>
+                        <input type="number" id="fibLow" placeholder="例: 60000" step="any" no-mb>
+                    </div>
+                </div>
+
+                <div class="flex mt" style="gap:8px">
+                    <button class="btn-primary" onclick="calcFib()" style="flex:1">计算回调位</button>
+                    <button class="btn-green" onclick="autoFillPrice()" style="flex:1">自动填入当前价</button>
+                    <button class="btn-outline" onclick="batchAddFibOrders()">批量添加</button>
+                </div>
+
+                <!-- Fib Level Table with per-level direction/amount -->
+                <div id="fibResult" class="mt"></div>
+            </div>
+        </div>
+
+        <!-- Price Trigger Order (挂单) -->
+        <div class="card">
+            <div class="card-hd">⚡ 价格触发单（挂单）</div>
+            <div class="card-bd">
+                <label>交易对</label>
+                <select id="triggerSymbol" class="no-mb">
+                    <option value="BTC-USDT">BTC/USDT</option>
+                    <option value="ETH-USDT">ETH/USDT</option>
+                    <option value="SOL-USDT">SOL/USDT</option>
+                    <option value="BNB-USDT">BNB/USDT</option>
+                    <option value="DOGE-USDT">DOGE/USDT</option>
+                    <option value="XRP-USDT">XRP/USDT</option>
+                </select>
+
+                <div class="flex mt" style="gap:10px">
+                    <div style="flex:1">
+                        <label>触发价格 ($)</label>
+                        <input type="number" id="triggerPrice" placeholder="例: 65000" step="any" no-mb>
                     </div>
                     <div style="flex:1">
                         <label>金额 (USDT)</label>
-                        <input type="number" id="orderAmount" value="3" min="1" step="0.01">
+                        <input type="number" id="triggerAmount" value="5" min="1" step="0.01" no-mb>
                     </div>
                 </div>
-                <button class="btn-primary mt" onclick="placeManualOrder()" style="width:100%">🚀 立即下单</button>
+
+                <div class="flex mt" style="gap:10px">
+                    <div style="flex:1">
+                        <label>方向</label>
+                        <select id="triggerDir" class="no-mb">
+                            <option value="BUY">📈 做多 BUY</option>
+                            <option value="SELL">📉 做空 SELL</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button class="btn-primary mt" onclick="addPriceOrder()" style="width:100%">➕ 添加到监控</button>
             </div>
         </div>
     </div>
 
-    <!-- RIGHT: Strategies + Log -->
+    <!-- RIGHT COLUMN -->
     <div>
-        <!-- Add Strategy -->
+
+        <!-- Pending Orders List (监控列表) -->
         <div class="card mb">
-            <div class="card-hd">💡 保存策略</div>
-            <div class="card-bd">
-                <label>策略名称</label>
-                <input type="text" id="strategyName" placeholder="例: BTC 61.8%回调做多">
-                <div class="flex" style="gap:10px">
-                    <div style="flex:1">
-                        <label>交易对</label>
-                        <select id="strategySymbol">
-                            <option value="btc_usdt">BTC/USDT</option>
-                            <option value="eth_usdt">ETH/USDT</option>
-                            <option value="sol_usdt">SOL/USDT</option>
-                            <option value="bnb_usdt">BNB/USDT</option>
-                            <option value="doge_usdt">DOGE/USDT</option>
-                            <option value="xrp_usdt">XRP/USDT</option>
-                        </select>
-                    </div>
-                    <div style="flex:1">
-                        <label>方向</label>
-                        <select id="strategyDir"><option value="BUY">📈 做多</option><option value="SELL">📉 做空</option></select>
-                    </div>
+            <div class="card-hd">
+                📋 监控列表
+                <span id="orderCount" style="margin-left:auto;font-size:11px;color:var(--text3)">0 个活跃</span>
+            </div>
+            <div class="card-bd" id="pendingOrdersList">
+                <div style="color:var(--text3);font-size:12px;text-align:center;padding:20px 0">
+                    暂无监控单<br><span style="font-size:10px">在左侧添加价格触发单或斐波那契回调位单</span>
                 </div>
-                <div class="flex" style="gap:10px">
-                    <div style="flex:1">
-                        <label>金额 (USDT)</label>
-                        <input type="number" id="strategyAmount" value="3" min="1" step="0.01">
-                    </div>
-                    <div style="flex:1">
-                        <label>监控周期</label>
-                        <select id="strategyPeriod">
-                            <option value="5">5分钟</option>
-                            <option value="10" selected>10分钟</option>
-                            <option value="15">15分钟</option>
-                            <option value="30">30分钟</option>
-                            <option value="60">1小时</option>
-                        </select>
-                    </div>
-                </div>
-                <label style="margin-top:8px">
-                    <input type="checkbox" id="strategyAutoTrade"> 🤖 启用自动下单（价格触达时自动执行）
-                </label>
-                <div id="strategyFibLevels" class="mt" style="font-size:11px;color:var(--text2)">请先在左侧计算斐波那契回调位</div>
-                <button class="btn-green mt" onclick="saveStrategy()" style="width:100%">💾 保存策略</button>
             </div>
         </div>
 
-        <!-- Strategy List -->
-        <div class="card mb">
-            <div class="card-hd">📋 策略列表 <span id="strategyCount" style="margin-left:auto;font-size:11px;color:var(--text3)">0 个</span></div>
-            <div class="card-bd" id="strategyList">
-                <div style="color:var(--text3);font-size:12px">暂无策略，请先保存</div>
-            </div>
-        </div>
-
-        <!-- Log -->
+        <!-- Log & Settings -->
         <div class="card">
             <div class="card-hd">📜 运行日志 & 设置 <button class="btn-xs" onclick="clearLog()" style="margin-left:auto;background:var(--bg4);color:var(--text2);border:1px solid var(--border)">清空</button></div>
             <div class="card-bd" style="padding:8px">
                 <!-- Worker URL Config -->
                 <div style="margin-bottom:8px;padding:8px;background:var(--bg4);border-radius:6px;border:1px solid var(--border)">
-                    <label style="font-size:11px;color:var(--text2);margin-bottom:4px;display:block">
-                        ☁️ Cloudflare Worker 中转地址（推荐配置，解决国内网络问题）
-                    </label>
+                    <label style="font-size:11px;color:var(--text2);margin-bottom:4px;display:block">☁️ Cloudflare Worker 中转地址（可选）</label>
                     <div class="flex" style="gap:6px">
-                        <input type="text" id="workerUrl" placeholder="例: https://your-worker.workers.dev" style="flex:1;margin-bottom:0;font-size:12px" value="">
+                        <input type="text" id="workerUrl" placeholder="例: https://your-worker.workers.dev" style="flex:1;margin-bottom:0;font-size:12px">
                         <button class="btn-xs btn-primary" onclick="saveWorkerUrl()">保存</button>
-                    </div>
-                    <div style="font-size:10px;color:var(--text3);margin-top:4px">
-                        未配置则尝试直连 Binance / CoinGecko（可能因网络原因失败）
                     </div>
                 </div>
 
                 <!-- HiBT Token Config -->
                 <div style="margin-bottom:8px;padding:8px;background:var(--bg4);border-radius:6px;border:1px solid var(--border)">
-                    <label style="font-size:11px;color:var(--text2);margin-bottom:4px;display:block">
-                        🔑 HiBT Token（下单必需，从 hibt.com 登录后获取）
-                    </label>
+                    <label style="font-size:11px;color:var(--text2);margin-bottom:4px;display:block">🔑 HiBT Token（下单必需）</label>
                     <div class="flex" style="gap:6px;align-items:flex-start">
                         <textarea id="hibtToken" placeholder="粘贴 JWT Token..." rows="2" style="flex:1;font-family:monospace;font-size:11px;margin-bottom:0;resize:vertical"></textarea>
                         <button class="btn-xs btn-green" onclick="saveHiBTToken()" style="white-space:nowrap;margin-top:0">保存</button>
                     </div>
                     <div class="flex" style="gap:8px;margin-top:4px">
                         <span id="tokenStatus" class="text-muted" style="font-size:10px">未设置</span>
-                        <button class="btn-xs" onclick="testHiBTToken()" style="background:var(--bg);color:var(--text2);border:1px solid var(--border)">测试连接</button>
+                        <button class="btn-xs" onclick="testHiBTToken()" style="background:var(--bg);color:var(--text2);border:1px solid var(--border)">测试</button>
                     </div>
                 </div>
+
                 <div id="logBox"></div>
             </div>
         </div>
@@ -311,11 +287,10 @@ hr { border:none; border-top:1px solid var(--border); margin:12px 0; }
 //  State
 // ============================================================
 const state = {
-    prices: {},             // { btc_usdt: { price, change, high, low, volume } }
-    strategies: JSON.parse(localStorage.getItem('strategies') || '[]'),
-    fibResult: null,        // { high, low, levels: [{pct, price}] }
+    prices: {},
+    pendingOrders: JSON.parse(localStorage.getItem('pendingOrders') || '[]'),
+    fibResult: null,
     loggedPrices: false,
-    triggeredLevels: {},     // "strategyId_levelPct": timestamp
 };
 
 // ============================================================
@@ -333,11 +308,11 @@ const BINANCE_SYMS = Object.values(SYMBOL_MAP);
 async function fetchPrices() {
     setStatus('loading', '获取行情…');
 
-    // ---- Source 0: 本地代理（localhost，走系统代理）----
+    // ---- Source 0: 本地代理（localhost）----
     try {
         const resp = await fetch('/api/price', { signal: AbortSignal.timeout(8000) });
         if (resp.ok) { processBinanceData(await resp.json(), '本地代理'); return; }
-    } catch(e) { /* 本地代理不可能时静默跳过 */ }
+    } catch(e) {}
 
     // ---- Source 1: Cloudflare Worker 中转 ----
     const workerUrl = (localStorage.getItem('workerUrl') || '').trim().replace(/\/$/, '');
@@ -350,21 +325,21 @@ async function fetchPrices() {
         } catch(e) { log('warn', `Worker 失败: ${e.message}`); }
     }
 
-    // ---- Source 2: data-api.binance.vision（国内可达）----
+    // ---- Source 2: data-api.binance.vision ----
     try {
         const url = `${BINANCE_API.replace('api.binance.com','data-api.binance.vision/api')}/ticker/24hr?symbols=${encodeURIComponent(JSON.stringify(BINANCE_SYMS))}`;
         const resp = await fetch(url, { signal: AbortSignal.timeout(6000) });
         if (resp.ok) { processBinanceData(await resp.json(), 'data-api'); return; }
     } catch(e) { log('warn', `data-api 失败: ${e.message}`); }
 
-    // ---- Source 2: api.binance.com 直连（需代理环境）----
+    // ---- Source 3: api.binance.com 直连 ----
     try {
         const url = `${BINANCE_API}/ticker/24hr?symbols=${encodeURIComponent(JSON.stringify(BINANCE_SYMS))}`;
         const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
         if (resp.ok) { processBinanceData(await resp.json(), 'Binance'); return; }
     } catch(e) { log('warn', `Binance 直连失败: ${e.message}`); }
 
-    // ---- Source 3: CoinGecko fallback ----
+    // ---- Source 4: CoinGecko fallback ----
     try {
         const ids = ['bitcoin','ethereum','solana','binancecoin','dogecoin','ripple'];
         const cgMap = { bitcoin:'btc_usdt', ethereum:'eth_usdt', solana:'sol_usdt', binancecoin:'bnb_usdt', dogecoin:'doge_usdt', ripple:'xrp_usdt' };
@@ -377,11 +352,10 @@ async function fetchPrices() {
                 state.prices[sym] = { price:+val.usd, change:+(val.usd_24h_change||0), high:0, low:0, volume:0 };
                 n++;
             });
-            if (n > 0) { renderPrices(); checkStrategies(); setStatus('ok','CoinGecko'); document.getElementById('lastUpdate').textContent='更新于 '+new Date().toLocaleTimeString()+' (CoinGecko)'; return; }
+            if (n > 0) { renderPrices(); checkPendingOrders(); setStatus('ok','CoinGecko'); document.getElementById('lastUpdate').textContent='更新于 '+new Date().toLocaleTimeString()+' (CoinGecko)'; return; }
         }
     } catch(e) { log('warn', `CoinGecko 失败: ${e.message}`); }
 
-    // ---- 全部失败 ----
     log('err', '⚠️ 所有行情源失败');
     setStatus('error', '无行情数据');
 }
@@ -397,7 +371,7 @@ function processBinanceData(data, src) {
             volume: +item.volume||0,
         };
     });
-    renderPrices(); checkStrategies();
+    renderPrices(); checkPendingOrders();
     setStatus('ok', '行情正常');
     document.getElementById('lastUpdate').textContent = '更新于 ' + new Date().toLocaleTimeString();
     if (!state.loggedPrices) { log('ok', `✅ 行情已加载 (${src})`); state.loggedPrices = true; }
@@ -440,213 +414,341 @@ function renderPrices() {
 }
 
 // ============================================================
-//  Fibonacci Calculator
+//  Fibonacci Calculator — Enhanced with per-level inputs
 // ============================================================
+const FIB_LEVELS_DEF = [
+    { pct: 0,     label: '0% (低点)'          },
+    { pct: 23.6,  label: '23.6%'              },
+    { pct: 38.2,  label: '38.2%'              },
+    { pct: 50,    label: '50%'                 },
+    { pct: 61.8,  label: '61.8% (黄金)'       },
+    { pct: 78.6,  label: '78.6%'               },
+    { pct: 88.6,  label: '88.6%'               },
+    { pct: 100,   label: '100% (高点)'         },
+];
+
 function calcFib() {
     const high = parseFloat(document.getElementById('fibHigh').value);
     const low  = parseFloat(document.getElementById('fibLow').value);
     if (!high || !low || high <= low) { alert('请输入有效的高点和低点（高点 > 低点）'); return; }
     const diff = high - low;
-    const levels = [
-        { pct: 0,    label: '0% (低点)',     price: low },
-        { pct: 23.6, label: '23.6%',         price: high - diff * 0.236 },
-        { pct: 38.2, label: '38.2%',         price: high - diff * 0.382 },
-        { pct: 50,   label: '50%',            price: high - diff * 0.5 },
-        { pct: 61.8, label: '61.8% (黄金)',  price: high - diff * 0.618 },
-        { pct: 78.6, label: '78.6%',          price: high - diff * 0.786 },
-        { pct: 100,  label: '100% (高点)',    price: high },
-    ];
+    const levels = FIB_LEVELS_DEF.map(lv => ({
+        ...lv,
+        price: high - diff * (lv.pct / 100),
+        direction: lv.pct <= 50 ? 'BUY' : 'SELL',
+        amount: '',
+    }));
     state.fibResult = { high, low, levels };
-    renderFib(levels);
-    updateStrategyFibLevels(levels);
+    renderFibWithInputs(levels);
     log('info', `📐 斐波那契计算: ${high} → ${low}，共${levels.length}个回调位`);
 }
 
-function renderFib(levels) {
-    let html = '<div style="font-size:12px;margin-bottom:6px;color:var(--text2)">回调位计算结果：</div><div class="fib-grid">';
-    const upTrend = state.fibResult.high > state.fibResult.low;
-    levels.forEach(lv => {
-        const key = lv.pct;
-        html += `<div class="fib-item">
-            <span class="fib-pct">${lv.label}</span>
-            <span class="fib-price mono">${lv.price.toFixed(2)}</span>
-        </div>`;
+function renderFibWithInputs(levels) {
+    let html = '<table class="fib-table"><thead><tr>';
+    html += '<th>回调位</th><th>目标价格</th><th>方向</th><th>金额(U)</th><th>操作</th>';
+    html += '</tr></thead><tbody>';
+
+    levels.forEach((lv, idx) => {
+        const isGolden = lv.pct === 61.8;
+        // check if already in pending orders for this level
+        const inOrders = isFibLevelInOrders(lv.pct);
+        const rowClass = inOrders ? 'fib-row-added' : '';
+
+        html += `<tr class="${rowClass}" id="fibRow_${lv.pct}">`;
+        html += `<td class="fib-pct-label ${isGolden?'fib-golden':''}">${lv.label}</td>`;
+        html += `<td class="fib-price-cell mono">${lv.price.toFixed(2)}</td>`;
+        html += `<td>`;
+        html += `<select class="fib-dir-sel" id="fibDir_${lv.pct}" ${inOrders?'disabled':''}>`;
+        html += `<option value="BUY" ${lv.direction==='BUY'?'selected':''}>📈 多</option>`;
+        html += `<option value="SELL" ${lv.direction==='SELL'?'selected':''}>📉 空</option>`;
+        html += `</select>`;
+        html += `</td>`;
+        html += `<td>`;
+        html += `<input type="number" class="fib-amount-input" id="fibAmt_${lv.pct}" placeholder="U" min="0.01" step="0.01" value="${lv.amount||''}" ${inOrders?'disabled':''}>`;
+        html += `</td>`;
+        html += `<td style="width:70px">`;
+        if (inOrders) {
+            html += `<span class="badge badge-green">已加入✓</span>`;
+        } else {
+            html += `<button class="fib-action-btn btn-primary btn-xs" onclick="addSingleFibOrder(${lv.pct})">加入</button>`;
+        }
+        html += `</td>`;
+        html += `</tr>`;
     });
-    html += '</div>';
+
+    html += '</tbody></table>';
     document.getElementById('fibResult').innerHTML = html;
 }
 
+/** Check if a fib percentage level is already in the pending orders */
+function isFibLevelInOrders(pct) {
+    if (!state.fibResult) return false;
+    return state.pendingOrders.some(o =>
+        o.type === 'fib' &&
+        o.fibHigh === state.fibResult.high &&
+        o.fibLow === state.fibResult.low &&
+        o.fibPct === pct &&
+        o.enabled
+    );
+}
+
+/** Add a single fib level to monitoring */
+function addSingleFibOrder(pct) {
+    if (!state.fibResult) { alert('请先计算斐波那契回调位'); return; }
+    const lv = state.fibResult.levels.find(l => l.pct === pct);
+    if (!lv) return;
+
+    const dirEl = document.getElementById(`fibDir_${pct}`);
+    const amtEl = document.getElementById(`fibAmt_${pct}`);
+    const direction = dirEl ? dirEl.value : 'BUY';
+    const amount = parseFloat(amtEl?.value) || 0;
+
+    if (!amount || amount <= 0) { alert('请输入有效的下单金额'); return; }
+
+    const symbol = document.getElementById('fibSymbol').value;
+    const order = {
+        id: 'fib_' + Date.now().toString(36) + '_' + Math.round(pct),
+        type: 'fib',
+        symbol: symbol,
+        fibHigh: state.fibResult.high,
+        fibLow: state.fibResult.low,
+        fibPct: pct,
+        targetPrice: lv.price,
+        direction: direction,
+        amount: amount,
+        enabled: true,
+        createdAt: new Date().toISOString(),
+        triggeredAt: null,
+    };
+    state.pendingOrders.push(order);
+    savePendingOrders();
+    renderPendingOrders();
+    renderFibWithInputs(state.fibResult.levels); // refresh table to show "added"
+    log('ok', `📐 已添加回调位单: ${symbol} ${pct}% @ $${lv.price.toFixed(2)} ${direction} ${amount}U`);
+}
+
+/** Batch add all fib levels that have amounts filled in */
+function batchAddFibOrders() {
+    if (!state.fibResult) { alert('请先计算斐波那契回调位'); return; }
+    let added = 0;
+    const symbol = document.getElementById('fibSymbol').value;
+
+    FIB_LEVELS_DEF.forEach(lv => {
+        const amtEl = document.getElementById(`fibAmt_${lv.pct}`);
+        const dirEl = document.getElementById(`fibDir_${lv.pct}`);
+        if (!amtEl || !dirEl) return;
+        const amount = parseFloat(amtEl.value);
+        if (!amount || amount <= 0) return;
+        // skip if already exists
+        if (isFibLevelInOrders(lv.pct)) return;
+
+        const priceLv = state.fibResult.levels.find(l => l.pct === lv.pct);
+        if (!priceLv) return;
+
+        const order = {
+            id: 'fib_' + Date.now().toString(36) + '_' + Math.round(lv.pct) + '_' + added,
+            type: 'fib',
+            symbol: symbol,
+            fibHigh: state.fibResult.high,
+            fibLow: state.fibResult.low,
+            fibPct: lv.pct,
+            targetPrice: priceLv.price,
+            direction: dirEl.value,
+            amount: amount,
+            enabled: true,
+            createdAt: new Date().toISOString(),
+            triggeredAt: null,
+        };
+        state.pendingOrders.push(order);
+        added++;
+    });
+
+    if (added === 0) { alert('没有找到已填写金额的回调位，请至少在一个位填入金额后点击「加入」或填写金额后点击「批量添加」'); return; }
+
+    savePendingOrders();
+    renderPendingOrders();
+    renderFibWithInputs(state.fibResult.levels);
+    log('ok', `📐 批量添加了 ${added} 个回调位单`);
+}
+
 function autoFillPrice() {
-    const sym = document.getElementById('fibSymbol').value;
-    const d = state.prices[sym];
+    // Map UI symbol format (BTC-USDT) to internal key (btc_usdt)
+    const symMap = { 'BTC-USDT': 'btc_usdt', 'ETH-USDT': 'eth_usdt', 'SOL-USDT': 'sol_usdt',
+                     'BNB-USDT': 'bnb_usdt', 'DOGE-USDT': 'doge_usdt', 'XRP-USDT': 'xrp_usdt' };
+    const uiSym = document.getElementById('fibSymbol').value;
+    const symKey = symMap[uiSym];
+    const d = state.prices[symKey];
     if (!d || !d.price) { alert('请先等待行情数据加载'); return; }
     const price = d.price;
     document.getElementById('fibHigh').value = price;
-    document.getElementById('fibLow').value  = (price * 0.95).toFixed(2); // default 5% range
-    log('info', `📥 已填入 ${sym} 当前价格 ${formatNum(price)}`);
-}
-
-function updateStrategyFibLevels(levels) {
-    let html = '勾选要监控的回调位：';
-    html += '<div style="margin-top:6px">';
-    levels.forEach(lv => {
-        html += `<span class="level-tag" id="fibTag_${lv.pct}" onclick="toggleFibTag('${lv.pct}')">
-            ${lv.label} ${lv.price.toFixed(2)}
-        </span>`;
-    });
-    html += '</div>';
-    document.getElementById('strategyFibLevels').innerHTML = html;
-    // reset selection
-    state._selectedFibLevels = [];
-}
-
-function toggleFibTag(pct) {
-    if (!state._selectedFibLevels) state._selectedFibLevels = [];
-    const idx = state._selectedFibLevels.indexOf(parseFloat(pct));
-    if (idx >= 0) {
-        state._selectedFibLevels.splice(idx, 1);
-        document.getElementById('fibTag_' + pct).classList.remove('active');
-    } else {
-        state._selectedFibLevels.push(parseFloat(pct));
-        document.getElementById('fibTag_' + pct).classList.add('active');
-    }
+    document.getElementById('fibLow').value = (price * 0.95).toFixed(2);
+    log('info', `📥 已填入 ${uiSym} 当前价格 ${formatNum(price)}`);
 }
 
 // ============================================================
-//  Strategy Management
+//  Price Trigger Order (挂单)
 // ============================================================
-function saveStrategy() {
-    const name = document.getElementById('strategyName').value.trim();
-    if (!name) { alert('请输入策略名称'); return; }
-    if (!state.fibResult) { alert('请先计算斐波那契回调位'); return; }
-    if (!state._selectedFibLevels || state._selectedFibLevels.length === 0) {
-        alert('请勾选至少一个小监控的回调位'); return;
-    }
-    const strategy = {
-        id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
-        name,
-        symbol:     document.getElementById('strategySymbol').value,
-        direction:  document.getElementById('strategyDir').value,
-        amount:     parseFloat(document.getElementById('strategyAmount').value) || 3,
-        period:     parseInt(document.getElementById('strategyPeriod').value) || 10,
-        autoTrade:  document.getElementById('strategyAutoTrade').checked,
-        selectedLevels: [...state._selectedFibLevels],
-        fibHigh:    state.fibResult.high,
-        fibLow:     state.fibResult.low,
-        createdAt:  new Date().toISOString(),
-        enabled:    true,
+function addPriceOrder() {
+    const symbol  = document.getElementById('triggerSymbol').value;
+    const price   = parseFloat(document.getElementById('triggerPrice').value);
+    const dir     = document.getElementById('triggerDir').value;
+    const amount  = parseFloat(document.getElementById('triggerAmount').value);
+
+    if (!price || price <= 0) { alert('请输入有效的触发价格'); return; }
+    if (!amount || amount <= 0) { alert('请输入有效的下单金额'); return; }
+
+    const order = {
+        id: 'px_' + Date.now().toString(36),
+        type: 'price',
+        symbol: symbol,
+        targetPrice: price,
+        direction: dir,
+        amount: amount,
+        enabled: true,
+        createdAt: new Date().toISOString(),
+        triggeredAt: null,
     };
-    state.strategies.push(strategy);
-    saveStrategies();
-    renderStrategies();
-    log('ok', `💾 策略已保存: ${name} (监控${strategy.selectedLevels.length}个回调位)`);
+
+    state.pendingOrders.push(order);
+    savePendingOrders();
+    renderPendingOrders();
+
+    // Clear input
+    document.getElementById('triggerPrice').value = '';
+    document.getElementById('triggerAmount').value = '5';
+
+    log('ok', `🎯 已添加价格触发单: ${symbol} @ $${formatNum(price)} ${dir} ${amount}U`);
 }
 
-function renderStrategies() {
-    const box = document.getElementById('strategyList');
-    document.getElementById('strategyCount').textContent = state.strategies.length + ' 个';
-    if (state.strategies.length === 0) {
-        box.innerHTML = '<div style="color:var(--text3);font-size:12px">暂无策略，请先保存</div>';
+// ============================================================
+//  Pending Orders Management (监控列表)
+// ============================================================
+function savePendingOrders() {
+    localStorage.setItem('pendingOrders', JSON.stringify(state.pendingOrders));
+}
+
+function renderPendingOrders() {
+    const box = document.getElementById('pendingOrdersList');
+    const activeCount = state.pendingOrders.filter(o => o.enabled && !o.triggeredAt).length;
+    const totalCount = state.pendingOrders.length;
+    document.getElementById('orderCount').textContent = `${activeCount} 个活跃 / 共 ${totalCount}`;
+
+    if (state.pendingOrders.length === 0) {
+        box.innerHTML = '<div style="color:var(--text3);font-size:12px;text-align:center;padding:20px 0">暂无监控单<br><span style="font-size:10px">在左侧添加价格触发单或斐波那契回调位单</span></div>';
         return;
     }
+
     box.innerHTML = '';
-    state.strategies.forEach(s => {
+    state.pendingOrders.forEach(order => {
         const div = document.createElement('div');
-        div.className = 'strategy-card';
-        const dirIcon = s.direction === 'BUY' ? '📈' : '📉';
-        const dirClass = s.direction === 'BUY' ? 'badge-green' : 'badge-red';
-        let levelsHtml = '监控位: ';
-        (s.selectedLevels || []).forEach(pct => {
-            const price = getFibPrice(s, pct);
-            const triggered = isLevelTriggered(s.id, pct);
-            levelsHtml += `<span class="level-tag ${triggered?'active':''}" onclick="toggleStrategyLevel('${s.id}','${pct}')" title="点击触发/取消">${pct}% ${formatNum(price)}${triggered?'✓':''}</span>`;
-        });
+        div.className = 'order-card';
+
+        let icon, typeLabel, detail;
+        if (order.type === 'price') {
+            icon = '🎯';
+            typeLabel = '价格触发';
+            detail = `${order.symbol} 触发价 $<strong>${formatNum(order.targetPrice)}</strong>`;
+        } else {
+            icon = '📐';
+            typeLabel = `${order.fibPct}% 回调位`;
+            detail = `${order.symbol} 目标价 $<strong>${formatNum(order.targetPrice)}</strong> (${order.fibHigh}→${order.fibLow})`;
+        }
+
+        const dirBadge = order.direction === 'BUY'
+            ? '<span class="badge badge-green">📈 多</span>'
+            : '<span class="badge badge-red">📉 空</span>';
+
+        const statusBadge = order.triggeredAt
+            ? '<span class="badge badge-yellow">已触发</span>'
+            : (order.enabled
+                ? '<span class="badge badge-green">监控中</span>'
+                : '<span class="badge badge-gray">已暂停</span>');
+
         div.innerHTML = `
-            <div class="strategy-header">
-                <span class="strategy-name">${dirIcon} ${s.name}</span>
-                <span class="badge ${s.enabled?(s.autoTrade?'badge-green':'badge-yellow'):'badge-red'}">
-                    ${s.enabled?(s.autoTrade?'🤖自动':'⏸手动'):'⛔停用'}
-                </span>
+            <div class="order-card-header">
+                <span class="order-card-title">${icon} ${typeLabel}</span>
+                <span>${statusBadge}</span>
             </div>
-            <div style="color:var(--text2);margin-bottom:6px">
-                ${s.symbol.replace('_','/')} · ${s.amount} USDT · ${s.period}分钟周期
+            <div class="order-card-detail">${detail}</div>
+            <div class="order-card-detail">
+                ${dirBadge}
+                <span style="margin-left:6px"><strong>${order.amount}</strong> USDT</span>
+                ${order.triggeredAt ? `<span style="margin-left:8px;color:var(--yellow)">触发于 ${new Date(order.triggeredAt).toLocaleTimeString()}</span>` : ''}
             </div>
-            <div style="margin-bottom:8px;font-size:11px">${levelsHtml}</div>
-            <div class="flex" style="gap:6px;flex-wrap:wrap">
-                <button class="btn-xs btn-green" onclick="toggleStrategy('${s.id}')">${s.enabled?'停用':'启用'}</button>
-                <button class="btn-xs btn-primary" onclick="toggleAutoTrade('${s.id}')">${s.autoTrade?'关闭自动':'开启自动'}</button>
-                <button class="btn-xs btn-red" onclick="deleteStrategy('${s.id}')">删除</button>
+            <div class="order-card-actions">
+                <button class="btn-xs ${order.enabled?'btn-outline':'btn-primary'}" onclick="togglePendingOrder('${order.id}')">${order.enabled?'暂停':'启用'}</button>
+                <button class="btn-xs btn-red" onclick="removePendingOrder('${order.id}')">删除</button>
+                ${!order.triggeredAt && order.enabled ? `<button class="btn-xs btn-green" onclick="manualTriggerOrder('${order.id}')">手动触发</button>` : ''}
             </div>
         `;
         box.appendChild(div);
     });
 }
 
-function getFibPrice(s, pct) {
-    const diff = s.fibHigh - s.fibLow;
-    return s.fibHigh - diff * (pct / 100);
+function togglePendingOrder(id) {
+    const o = state.pendingOrders.find(x => x.id === id);
+    if (!o) return;
+    o.enabled = !o.enabled;
+    savePendingOrders();
+    renderPendingOrders();
+    log('info', `${o.enabled?'✅':'⛔'} 监控单 [${o.type}] 已${o.enabled?'启用':'暂停'}`);
 }
 
-function toggleStrategy(id) {
-    const s = state.strategies.find(x => x.id === id); if (!s) return;
-    s.enabled = !s.enabled;
-    saveStrategies(); renderStrategies();
-    log('info', `${s.enabled?'✅':'⛔'} 策略「${s.name}」已${s.enabled?'启用':'停用'}`);
+function removePendingOrder(id) {
+    const o = state.pendingOrders.find(x => x.id === id);
+    if (!o) return;
+    if (!confirm(`确定删除此监控单？\n${o.type==='price'?`价格触发 @$${formatNum(o.targetPrice)}`:`${o.fibPct}% 回调位`}`)) return;
+    state.pendingOrders = state.pendingOrders.filter(x => x.id !== id);
+    savePendingOrders();
+    renderPendingOrders();
+    if (state.fibResult) renderFibWithInputs(state.fibResult.levels);
+    log('warn', `🗑️ 已删除监控单`);
 }
 
-function toggleAutoTrade(id) {
-    const s = state.strategies.find(x => x.id === id); if (!s) return;
-    s.autoTrade = !s.autoTrade;
-    saveStrategies(); renderStrategies();
-    log('info', `🤖 策略「${s.name}」自动下单已${s.autoTrade?'开启':'关闭'}`);
-}
-
-function deleteStrategy(id) {
-    const s = state.strategies.find(x => x.id === id); if (!s) return;
-    if (!confirm(`确定删除策略「${s.name}」？`)) return;
-    state.strategies = state.strategies.filter(x => x.id !== id);
-    saveStrategies(); renderStrategies();
-    log('warn', `🗑️ 已删除策略: ${s.name}`);
-}
-
-function toggleStrategyLevel(id, pct) {
-    // manual trigger for testing
-    const key = id + '_' + pct;
-    if (state.triggeredLevels[key]) {
-        delete state.triggeredLevels[key];
-        log('info', `↩️ 取消触发: ${pct}%`);
-    } else {
-        // simulate trigger
-        const s = state.strategies.find(x => x.id === id);
-        if (s && s.autoTrade) {
-            autoPlaceOrder(getFibPrice(s, parseFloat(pct)), s.direction, s.symbol, s.amount, s.period, pct + '%', s.id);
-        }
-    }
-    renderStrategies();
+/** Manual trigger an order for testing */
+async function manualTriggerOrder(id) {
+    const o = state.pendingOrders.find(x => x.id === id);
+    if (!o) return;
+    if (!confirm(`确认立即下单？\n${o.symbol} ${o.direction} ${o.amount} USDT\n目标: $${formatNum(o.targetPrice)}`)) return;
+    await placeOrder(o.symbol, o.direction, o.amount);
 }
 
 // ============================================================
-//  Price Trigger Check (auto-trade)
+//  Price Trigger Check (核心：检查所有挂单是否触达)
 // ============================================================
-function checkStrategies() {
-    if (!state.strategies.length) return;
+function checkPendingOrders() {
+    if (!state.pendingOrders.length) return;
     const now = Date.now();
-    state.strategies.forEach(s => {
-        if (!s.enabled || !s.autoTrade) return;
-        const curPrice = state.prices[s.symbol]?.price;
+
+    state.pendingOrders.forEach(order => {
+        if (!order.enabled || order.triggeredAt) return;
+
+        // Map symbol to internal key for price lookup
+        const symMap = {
+            'BTC-USDT': 'btc_usdt', 'ETH-USDT': 'eth_usdt', 'SOL-USDT': 'sol_usdt',
+            'BNB-USDT': 'bnb_usdt', 'DOGE-USDT': 'doge_usdt', 'XRP-USDT': 'xrp_usdt',
+        };
+        const priceKey = symMap[order.symbol] || order.symbol.toLowerCase().replace('-usdt','_usdt');
+        const curPrice = state.prices[priceKey]?.price;
         if (!curPrice) return;
-        (s.selectedLevels || []).forEach(pct => {
-            const target = getFibPrice(s, pct);
-            const key = s.id + '_' + pct;
-            const lastTriggered = state.triggeredLevels[key] || 0;
-            // trigger if price is within ±0.2%
-            const diff = Math.abs(curPrice - target) / target;
-            if (diff < 0.002 && now - lastTriggered > s.period * 60 * 1000) {
-                state.triggeredLevels[key] = now;
-                log('ok', `🎯 触发策略「${s.name}」${pct}%回调位，价格 ${formatNum(curPrice)} 接近目标 ${formatNum(target)}`);
-                autoPlaceOrder(curPrice, s.direction, s.symbol, s.amount, s.period, pct + '%', s.id);
-            }
-        });
+
+        // Check if current price is within ±0.2% of target
+        const target = order.targetPrice;
+        const diff = Math.abs(curPrice - target) / target;
+
+        if (diff < 0.002) {
+            order.triggeredAt = now;
+            savePendingOrders();
+
+            const label = order.type === 'price'
+                ? `@$${formatNum(target)}`
+                : `${order.fibPct}% @$$${formatNum(target)}`;
+            log('ok', `🎯 触发! ${order.symbol} 当前$${formatNum(curPrice)} 接近目标 $${formatNum(target)} (${label})`);
+
+            placeOrder(order.symbol, order.direction, order.amount);
+            renderPendingOrders();
+            if (state.fibResult) renderFibWithInputs(state.fibResult.levels);
+        }
     });
 }
 
@@ -660,7 +762,6 @@ const HIBT_KEY  = 'HotsCoinLimboA@1';
 function hibtSign(params) {
     const sorted = Object.keys(params).sort().map(k => `${k}=${params[k]}`).join('&');
     const signStr = sorted + HIBT_KEY;
-    // CryptoJS AES-ECB (must include CryptoJS in HTML)
     const key = CryptoJS.enc.Utf8.parse(HIBT_KEY);
     const encrypted = CryptoJS.AES.encrypt(signStr, key, { mode: CryptoJS.mode.ECB, padding: CryptoJS.pad.Pkcs7 });
     return encrypted.ciphertext.toString(CryptoJS.enc.Hex).toUpperCase();
@@ -680,15 +781,13 @@ async function placeOrder(symbol, direction, amountUsdt) {
     };
     params.sign = hibtSign(params);
 
-    // 优先级: 本地代理 → Cloudflare Worker → 直连
-    const workerUrl = (localStorage.getItem('workerUrl') || '').trim().replace(/\/$/, '');
+    // 路由选择: 本地代理 → Worker → 直连
     let apiUrl, viaLabel = '';
     if (!window.location.hostname.match(/^localhost|^127\.0\.0\.1|^::1$/)) {
-        // 非 localhost 环境（如 GitHub Pages），用 Worker 或直连
+        const workerUrl = (localStorage.getItem('workerUrl') || '').trim().replace(/\/$/, '');
         apiUrl = workerUrl ? `${workerUrl}/hibt/api/v1/order` : `${HIBT_API}/api/v1/order`;
         viaLabel = workerUrl ? ' (via Worker)' : '';
     } else {
-        // 本地代理环境
         apiUrl = '/api/hibt/api/v1/order';
         viaLabel = ' (本地代理)';
     }
@@ -718,26 +817,9 @@ async function placeOrder(symbol, direction, amountUsdt) {
     }
 }
 
-async function placeManualOrder() {
-    const sym     = document.getElementById('orderSymbol').value;
-    const dir     = document.getElementById('orderDir').value;
-    const amount  = parseFloat(document.getElementById('orderAmount').value) || 3;
-    if (!confirm(`确认下单？\n${sym} ${dir} ${amount} USDT`)) return;
-    await placeOrder(sym, dir, amount);
-}
-
-async function autoPlaceOrder(price, direction, symbol, amount, period, label, strategyId) {
-    log('ok', `🤖 自动下单: ${symbol} ${direction} ${amount} USDT (触发: ${label})`);
-    await placeOrder(symbol, direction, amount);
-}
-
 // ============================================================
-//  Storage + Init
+//  Storage + Init Helpers
 // ============================================================
-function saveStrategies() {
-    localStorage.setItem('strategies', JSON.stringify(state.strategies));
-}
-
 function setStatus(type, text) {
     const dot = document.getElementById('statusDot');
     const txt = document.getElementById('statusText');
@@ -761,7 +843,7 @@ function clearLog() {
 
 function saveWorkerUrl() {
     const url = document.getElementById('workerUrl').value.trim().replace(/\/$/, '');
-    if (url && !url.startsWith('http')) { alert('请输入有效的 URL（以 http:// 或 https:// 开头）'); return; }
+    if (url && !url.startsWith('http')) { alert('请输入有效的 URL'); return; }
     localStorage.setItem('workerUrl', url || '');
     log('info', url ? `☁️ Worker 地址已保存: ${url}` : '☁️ Worker 地址已清除');
     fetchPrices();
@@ -778,7 +860,6 @@ function updateTokenStatus() {
     const token = localStorage.getItem('hibt_token') || '';
     const el = document.getElementById('tokenStatus');
     if (!token) { el.textContent = '未设置'; el.style.color = 'var(--red)'; return; }
-    // show first/last 8 chars
     const preview = token.length > 20 ? token.slice(0,8) + '...' + token.slice(-8) : token;
     el.textContent = `已设置: ${preview}`;
     el.style.color = 'var(--green)';
@@ -789,7 +870,6 @@ async function testHiBTToken() {
     if (!token) { alert('请先输入并保存 Token'); return; }
     log('info', '🔍 测试 HiBT 连接…');
 
-    // 优先级: 本地代理 → Worker → 直连
     const workerUrl = (localStorage.getItem('workerUrl') || '').trim().replace(/\/$/, '');
     let apiUrl, viaLabel = '';
     if (!window.location.hostname.match(/^localhost|^127\.0\.0\.1|^::1$/)) {
@@ -829,19 +909,23 @@ function formatNum(n) {
     return n.toFixed(2);
 }
 
-// Init
-renderStrategies();
+// ============================================================
+//  Init
+// ============================================================
+renderPendingOrders();
+
+// Restore settings
 const savedWorkerUrl = localStorage.getItem('workerUrl') || '';
 if (savedWorkerUrl) { document.getElementById('workerUrl').value = savedWorkerUrl; }
-// load saved token
 const savedToken = localStorage.getItem('hibt_token') || '';
 if (document.getElementById('hibtToken') && savedToken) {
     document.getElementById('hibtToken').value = savedToken;
     updateTokenStatus();
 }
-log('info', '🚀 HiBT Trader 启动');
+
+log('info', `🚀 HiBT Trader 启动 | ${state.pendingOrders.length} 个挂单待监控`);
 fetchPrices();
-setInterval(fetchPrices, 30000);
+setInterval(fetchPrices, 15000);  // 15秒刷新行情（更频繁以捕捉触达）
 </script>
 
 <!-- CryptoJS for HiBT API signature -->
