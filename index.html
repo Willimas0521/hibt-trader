@@ -320,10 +320,7 @@ const state = {
 
 // ============================================================
 //  Price Feed — 多数据源自动切换
-//  优先级: Cloudflare Worker → Binance直连 → CoinGecko
-//  注意: 国内网络环境，api.binance.com / data-api.binance.vision
-//        可能被 GFW 干扰(浏览器端 ERR_CONNECTION_RESET)，
-//        需通过 Cloudflare Worker 等海外中转访问
+//  优先级: 本地代理 → Cloudflare Worker → Binance直连 → CoinGecko
 // ============================================================
 const BINANCE_API = 'https://api.binance.com/api/v3';
 const SYMBOL_MAP = {
@@ -336,7 +333,13 @@ const BINANCE_SYMS = Object.values(SYMBOL_MAP);
 async function fetchPrices() {
     setStatus('loading', '获取行情…');
 
-    // ---- Source 0: Cloudflare Worker 中转（最稳定）----
+    // ---- Source 0: 本地代理（localhost，走系统代理）----
+    try {
+        const resp = await fetch('/api/price', { signal: AbortSignal.timeout(8000) });
+        if (resp.ok) { processBinanceData(await resp.json(), '本地代理'); return; }
+    } catch(e) { /* 本地代理不可能时静默跳过 */ }
+
+    // ---- Source 1: Cloudflare Worker 中转 ----
     const workerUrl = (localStorage.getItem('workerUrl') || '').trim().replace(/\/$/, '');
     if (workerUrl) {
         try {
@@ -347,7 +350,7 @@ async function fetchPrices() {
         } catch(e) { log('warn', `Worker 失败: ${e.message}`); }
     }
 
-    // ---- Source 1: data-api.binance.vision（国内可达）----
+    // ---- Source 2: data-api.binance.vision（国内可达）----
     try {
         const url = `${BINANCE_API.replace('api.binance.com','data-api.binance.vision/api')}/ticker/24hr?symbols=${encodeURIComponent(JSON.stringify(BINANCE_SYMS))}`;
         const resp = await fetch(url, { signal: AbortSignal.timeout(6000) });
@@ -677,13 +680,20 @@ async function placeOrder(symbol, direction, amountUsdt) {
     };
     params.sign = hibtSign(params);
 
-    // 如果配置了 Worker，走中转（解决 GFW 问题）
-    const workerUrl = localStorage.getItem('workerUrl') || '';
-    const apiUrl = workerUrl
-        ? `${workerUrl}/hibt/api/v1/order`
-        : `${HIBT_API}/api/v1/order`;
+    // 优先级: 本地代理 → Cloudflare Worker → 直连
+    const workerUrl = (localStorage.getItem('workerUrl') || '').trim().replace(/\/$/, '');
+    let apiUrl, viaLabel = '';
+    if (!window.location.hostname.match(/^localhost|^127\.0\.0\.1|^::1$/)) {
+        // 非 localhost 环境（如 GitHub Pages），用 Worker 或直连
+        apiUrl = workerUrl ? `${workerUrl}/hibt/api/v1/order` : `${HIBT_API}/api/v1/order`;
+        viaLabel = workerUrl ? ' (via Worker)' : '';
+    } else {
+        // 本地代理环境
+        apiUrl = '/api/hibt/api/v1/order';
+        viaLabel = ' (本地代理)';
+    }
 
-    log('info', `📤 下单请求: ${symbol} ${direction} ${amountUsdt} USDT${workerUrl?' (via Worker)':''}`);
+    log('info', `📤 下单请求: ${symbol} ${direction} ${amountUsdt} USDT${viaLabel}`);
     try {
         const resp = await fetch(apiUrl, {
             method: 'POST',
@@ -779,11 +789,16 @@ async function testHiBTToken() {
     if (!token) { alert('请先输入并保存 Token'); return; }
     log('info', '🔍 测试 HiBT 连接…');
 
-    // 如果配置了 Worker，走中转（解决 GFW 问题）
+    // 优先级: 本地代理 → Worker → 直连
     const workerUrl = (localStorage.getItem('workerUrl') || '').trim().replace(/\/$/, '');
-    const apiUrl = workerUrl
-        ? `${workerUrl}/hibt/api/v1/account`
-        : `${HIBT_API}/api/v1/account`;
+    let apiUrl, viaLabel = '';
+    if (!window.location.hostname.match(/^localhost|^127\.0\.0\.1|^::1$/)) {
+        apiUrl = workerUrl ? `${workerUrl}/hibt/api/v1/account` : `${HIBT_API}/api/v1/account`;
+        viaLabel = workerUrl ? ' (via Worker)' : '';
+    } else {
+        apiUrl = '/api/hibt/api/v1/account';
+        viaLabel = ' (本地代理)';
+    }
 
     try {
         const resp = await fetch(apiUrl, {
@@ -795,7 +810,7 @@ async function testHiBTToken() {
         });
         const data = await resp.json();
         if (data.code === 0 || data.code === '0') {
-            log('ok', `✅ HiBT Token 有效！连接成功${workerUrl ? ' (via Worker)' : ''}`);
+            log('ok', `✅ HiBT Token 有效！连接成功${viaLabel}`);
             alert('✅ Token 验证成功，账户连接正常！');
         } else {
             log('err', `❌ Token 无效: ${data.msg || JSON.stringify(data)}`);
