@@ -285,6 +285,21 @@ hr { border:none; border-top:1px solid var(--border); margin:12px 0; }
                         未配置则尝试直连 Binance / CoinGecko（可能因网络原因失败）
                     </div>
                 </div>
+
+                <!-- HiBT Token Config -->
+                <div style="margin-bottom:8px;padding:8px;background:var(--bg4);border-radius:6px;border:1px solid var(--border)">
+                    <label style="font-size:11px;color:var(--text2);margin-bottom:4px;display:block">
+                        🔑 HiBT Token（下单必需，从 hibt.com 登录后获取）
+                    </label>
+                    <div class="flex" style="gap:6px;align-items:flex-start">
+                        <textarea id="hibtToken" placeholder="粘贴 JWT Token..." rows="2" style="flex:1;font-family:monospace;font-size:11px;margin-bottom:0;resize:vertical"></textarea>
+                        <button class="btn-xs btn-green" onclick="saveHiBTToken()" style="white-space:nowrap;margin-top:0">保存</button>
+                    </div>
+                    <div class="flex" style="gap:8px;margin-top:4px">
+                        <span id="tokenStatus" class="text-muted" style="font-size:10px">未设置</span>
+                        <button class="btn-xs" onclick="testHiBTToken()" style="background:var(--bg);color:var(--text2);border:1px solid var(--border)">测试连接</button>
+                    </div>
+                </div>
                 <div id="logBox"></div>
             </div>
         </div>
@@ -649,6 +664,9 @@ function hibtSign(params) {
 }
 
 async function placeOrder(symbol, direction, amountUsdt) {
+    const token = getHiBTToken();
+    if (!token) { log('err', '❌ 未设置 HiBT Token，请在右下角设置面板填入 Token'); return false; }
+
     const params = {
         bget_id: HIBT_ID,
         symbol:  symbol,
@@ -662,7 +680,10 @@ async function placeOrder(symbol, direction, amountUsdt) {
     try {
         const resp = await fetch(`${HIBT_API}/api/v1/order`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
             body: JSON.stringify(params),
             signal: AbortSignal.timeout(10000),
         });
@@ -726,8 +747,52 @@ function saveWorkerUrl() {
     if (url && !url.startsWith('http')) { alert('请输入有效的 URL（以 http:// 或 https:// 开头）'); return; }
     localStorage.setItem('workerUrl', url || '');
     log('info', url ? `☁️ Worker 地址已保存: ${url}` : '☁️ Worker 地址已清除');
-    // 立即尝试用新地址获取行情
     fetchPrices();
+}
+
+function saveHiBTToken() {
+    const token = document.getElementById('hibtToken').value.trim();
+    localStorage.setItem('hibt_token', token);
+    updateTokenStatus();
+    log('info', token ? '🔑 HiBT Token 已保存' : '🔑 HiBT Token 已清除');
+}
+
+function updateTokenStatus() {
+    const token = localStorage.getItem('hibt_token') || '';
+    const el = document.getElementById('tokenStatus');
+    if (!token) { el.textContent = '未设置'; el.style.color = 'var(--red)'; return; }
+    // show first/last 8 chars
+    const preview = token.length > 20 ? token.slice(0,8) + '...' + token.slice(-8) : token;
+    el.textContent = `已设置: ${preview}`;
+    el.style.color = 'var(--green)';
+}
+
+async function testHiBTToken() {
+    const token = localStorage.getItem('hibt_token') || '';
+    if (!token) { alert('请先输入并保存 Token'); return; }
+    log('info', '🔍 测试 HiBT 连接…');
+    try {
+        const resp = await fetch(`${HIBT_API}/api/v1/account`, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+            signal: AbortSignal.timeout(10000),
+        });
+        const data = await resp.json();
+        if (data.code === 0 || data.code === '0') {
+            log('ok', '✅ HiBT Token 有效！连接成功');
+            alert('✅ Token 验证成功，账户连接正常！');
+        } else {
+            log('err', `❌ Token 无效: ${data.msg || JSON.stringify(data)}`);
+        }
+    } catch(e) {
+        log('err', `❌ 连接失败: ${e.message}`);
+    }
+}
+
+function getHiBTToken() {
+    return localStorage.getItem('hibt_token') || '';
 }
 
 function formatNum(n) {
@@ -739,6 +804,12 @@ function formatNum(n) {
 renderStrategies();
 const savedWorkerUrl = localStorage.getItem('workerUrl') || '';
 if (savedWorkerUrl) { document.getElementById('workerUrl').value = savedWorkerUrl; }
+// load saved token
+const savedToken = localStorage.getItem('hibt_token') || '';
+if (document.getElementById('hibtToken') && savedToken) {
+    document.getElementById('hibtToken').value = savedToken;
+    updateTokenStatus();
+}
 log('info', '🚀 HiBT Trader 启动');
 fetchPrices();
 setInterval(fetchPrices, 30000);
