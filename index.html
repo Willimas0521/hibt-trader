@@ -270,8 +270,21 @@ hr { border:none; border-top:1px solid var(--border); margin:12px 0; }
 
         <!-- Log -->
         <div class="card">
-            <div class="card-hd">📜 运行日志 <button class="btn-xs" onclick="clearLog()" style="margin-left:auto;background:var(--bg4);color:var(--text2);border:1px solid var(--border)">清空</button></div>
+            <div class="card-hd">📜 运行日志 & 设置 <button class="btn-xs" onclick="clearLog()" style="margin-left:auto;background:var(--bg4);color:var(--text2);border:1px solid var(--border)">清空</button></div>
             <div class="card-bd" style="padding:8px">
+                <!-- Worker URL Config -->
+                <div style="margin-bottom:8px;padding:8px;background:var(--bg4);border-radius:6px;border:1px solid var(--border)">
+                    <label style="font-size:11px;color:var(--text2);margin-bottom:4px;display:block">
+                        ☁️ Cloudflare Worker 中转地址（推荐配置，解决国内网络问题）
+                    </label>
+                    <div class="flex" style="gap:6px">
+                        <input type="text" id="workerUrl" placeholder="例: https://your-worker.workers.dev" style="flex:1;margin-bottom:0;font-size:12px" value="">
+                        <button class="btn-xs btn-primary" onclick="saveWorkerUrl()">保存</button>
+                    </div>
+                    <div style="font-size:10px;color:var(--text3);margin-top:4px">
+                        未配置则尝试直连 Binance / CoinGecko（可能因网络原因失败）
+                    </div>
+                </div>
                 <div id="logBox"></div>
             </div>
         </div>
@@ -291,64 +304,85 @@ const state = {
 };
 
 // ============================================================
-//  Binance Price Feed (data-api.binance.vision, CN accessible)
+//  Price Feed — 多数据源自动切换
+//  优先级: Cloudflare Worker → Binance直连 → CoinGecko
+//  注意: 国内网络环境，api.binance.com / data-api.binance.vision
+//        可能被 GFW 干扰(浏览器端 ERR_CONNECTION_RESET)，
+//        需通过 Cloudflare Worker 等海外中转访问
 // ============================================================
-const BINANCE_API = 'https://data-api.binance.vision/api/v3';
+const BINANCE_API = 'https://api.binance.com/api/v3';
 const SYMBOL_MAP = {
     btc_usdt: 'BTCUSDT', eth_usdt: 'ETHUSDT', sol_usdt: 'SOLUSDT',
     bnb_usdt: 'BNBUSDT', doge_usdt: 'DOGEUSDT', xrp_usdt: 'XRPUSDT',
 };
 const REV_MAP = Object.fromEntries(Object.entries(SYMBOL_MAP).map(([k,v])=>[v,k]));
+const BINANCE_SYMS = Object.values(SYMBOL_MAP);
 
 async function fetchPrices() {
     setStatus('loading', '获取行情…');
-    try {
-        const syms = Object.values(SYMBOL_MAP);
-        const url = `${BINANCE_API}/ticker/24hr?symbols=${encodeURIComponent(JSON.stringify(syms))}`;
-        const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const data = await resp.json();
-        processBinance(data);
-    } catch(e) {
-        log('warn', `Binance 失败: ${e.message}，尝试逐个查询…`);
-        await fetchPricesFallback();
-    }
-}
 
-async function fetchPricesFallback() {
-    const syms = Object.values(SYMBOL_MAP);
-    let ok = 0;
-    for (const sym of syms) {
+    // ---- Source 0: Cloudflare Worker 中转（最稳定）----
+    const workerUrl = (localStorage.getItem('workerUrl') || '').trim().replace(/\/$/, '');
+    if (workerUrl) {
         try {
-            const resp = await fetch(`${BINANCE_API}/ticker/24hr?symbol=${sym}`, { signal: AbortSignal.timeout(5000) });
-            if (resp.ok) { processBinance([await resp.json()]); ok++; }
-        } catch(_) {}
-        await new Promise(r => setTimeout(r, 200));
+            log('info', `尝试 Worker: ${workerUrl}`);
+            const url = `${workerUrl}/price?symbols=${BINANCE_SYMS.join(',')}`;
+            const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
+            if (resp.ok) { processBinanceData(await resp.json(), 'Worker'); return; }
+        } catch(e) { log('warn', `Worker 失败: ${e.message}`); }
     }
-    if (ok === 0) {
-        log('err', '⚠️ 所有行情源失败，5秒后重试');
-        setStatus('error', '行情获取失败');
-        setTimeout(fetchPrices, 5000);
-    }
+
+    // ---- Source 1: data-api.binance.vision（国内可达）----
+    try {
+        const url = `${BINANCE_API.replace('api.binance.com','data-api.binance.vision/api')}/ticker/24hr?symbols=${encodeURIComponent(JSON.stringify(BINANCE_SYMS))}`;
+        const resp = await fetch(url, { signal: AbortSignal.timeout(6000) });
+        if (resp.ok) { processBinanceData(await resp.json(), 'data-api'); return; }
+    } catch(e) { log('warn', `data-api 失败: ${e.message}`); }
+
+    // ---- Source 2: api.binance.com 直连（需代理环境）----
+    try {
+        const url = `${BINANCE_API}/ticker/24hr?symbols=${encodeURIComponent(JSON.stringify(BINANCE_SYMS))}`;
+        const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
+        if (resp.ok) { processBinanceData(await resp.json(), 'Binance'); return; }
+    } catch(e) { log('warn', `Binance 直连失败: ${e.message}`); }
+
+    // ---- Source 3: CoinGecko fallback ----
+    try {
+        const ids = ['bitcoin','ethereum','solana','binancecoin','dogecoin','ripple'];
+        const cgMap = { bitcoin:'btc_usdt', ethereum:'eth_usdt', solana:'sol_usdt', binancecoin:'bnb_usdt', dogecoin:'doge_usdt', ripple:'xrp_usdt' };
+        const resp = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids.join(',')}&vs_currencies=usd&include_24hr_change=true`, { signal: AbortSignal.timeout(10000) });
+        if (resp.ok) {
+            const data = await resp.json();
+            let n = 0;
+            Object.entries(data).forEach(([key,val]) => {
+                const sym = cgMap[key]; if (!sym || !val.usd) return;
+                state.prices[sym] = { price:+val.usd, change:+(val.usd_24h_change||0), high:0, low:0, volume:0 };
+                n++;
+            });
+            if (n > 0) { renderPrices(); checkStrategies(); setStatus('ok','CoinGecko'); document.getElementById('lastUpdate').textContent='更新于 '+new Date().toLocaleTimeString()+' (CoinGecko)'; return; }
+        }
+    } catch(e) { log('warn', `CoinGecko 失败: ${e.message}`); }
+
+    // ---- 全部失败 ----
+    log('err', '⚠️ 所有行情源失败');
+    setStatus('error', '无行情数据');
 }
 
-function processBinance(data) {
+function processBinanceData(data, src) {
     (data || []).forEach(item => {
-        const sym = REV_MAP[item.symbol];
-        if (!sym) return;
+        const sym = REV_MAP[item.symbol]; if (!sym) return;
         state.prices[sym] = {
-            price:  parseFloat(item.lastPrice) || 0,
-            change: parseFloat(item.priceChangePercent) || 0,
-            high:   parseFloat(item.highPrice) || 0,
-            low:    parseFloat(item.lowPrice) || 0,
-            volume: parseFloat(item.volume) || 0,
+            price: +item.lastPrice||0,
+            change: +item.priceChangePercent||0,
+            high: +item.highPrice||0,
+            low: +item.lowPrice||0,
+            volume: +item.volume||0,
         };
     });
-    renderPrices();
-    checkStrategies();
+    renderPrices(); checkStrategies();
     setStatus('ok', '行情正常');
     document.getElementById('lastUpdate').textContent = '更新于 ' + new Date().toLocaleTimeString();
-    if (!state.loggedPrices) { log('ok', '✅ 行情数据已加载'); state.loggedPrices = true; }
+    if (!state.loggedPrices) { log('ok', `✅ 行情已加载 (${src})`); state.loggedPrices = true; }
 }
 
 function renderPrices() {
@@ -687,6 +721,15 @@ function clearLog() {
     log('info', '日志已清空');
 }
 
+function saveWorkerUrl() {
+    const url = document.getElementById('workerUrl').value.trim().replace(/\/$/, '');
+    if (url && !url.startsWith('http')) { alert('请输入有效的 URL（以 http:// 或 https:// 开头）'); return; }
+    localStorage.setItem('workerUrl', url || '');
+    log('info', url ? `☁️ Worker 地址已保存: ${url}` : '☁️ Worker 地址已清除');
+    // 立即尝试用新地址获取行情
+    fetchPrices();
+}
+
 function formatNum(n) {
     if (n >= 1000) return n.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 });
     return n.toFixed(2);
@@ -694,6 +737,8 @@ function formatNum(n) {
 
 // Init
 renderStrategies();
+const savedWorkerUrl = localStorage.getItem('workerUrl') || '';
+if (savedWorkerUrl) { document.getElementById('workerUrl').value = savedWorkerUrl; }
 log('info', '🚀 HiBT Trader 启动');
 fetchPrices();
 setInterval(fetchPrices, 30000);
